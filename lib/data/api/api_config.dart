@@ -10,7 +10,7 @@
 abstract final class ApiConfig {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://apps.ovsofts.com/RR/api/v1',
+    defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
     // defaultValue: 'http://127.0.0.1:8000/api/v1',
   );
 
