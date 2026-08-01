@@ -1,8 +1,25 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// The Maps SDK reads its key from the manifest, so `--dart-define` cannot reach
+// it the way it does on web. CI supplies MAPS_API_KEY as an environment
+// variable; locally, put `maps.apiKey=...` in android/local.properties, which is
+// already git-ignored. Empty is allowed — the app then falls back to its
+// stylised map instead of failing to build.
+val mapsApiKey: String = System.getenv("MAPS_API_KEY")
+    ?: rootProject.file("local.properties").let { file ->
+        if (file.exists()) {
+            Properties().apply { file.inputStream().use { load(it) } }
+                .getProperty("maps.apiKey") ?: ""
+        } else {
+            ""
+        }
+    }
 
 android {
     namespace = "in.co.ptpl.kaamwala_thekedar"
@@ -23,6 +40,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {

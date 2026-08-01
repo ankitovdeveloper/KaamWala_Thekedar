@@ -17,6 +17,11 @@ class MockRepository implements KaamWalaRepository {
   late List<Booking> _bookings = Mock.bookings();
   final Set<int> _saved = {};
 
+  /// Live jobs, keyed by booking id. Everything about a tracked job is derived
+  /// from its start time, so the simulation needs no timer of its own — each
+  /// poll simply asks "how far along should this be by now?".
+  final Map<int, _SimulatedJob> _jobs = {};
+
   Future<T> _delayed<T>(T value) async {
     if (latency > Duration.zero) await Future<void>.delayed(latency);
     return value;
@@ -118,15 +123,34 @@ class MockRepository implements KaamWalaRepository {
   // ── Bookings ──────────────────────────────────────────────────────────────
 
   @override
-  Future<List<Booking>> bookings({String tab = 'all'}) =>
-      _delayed(switch (tab) {
-        'active' =>
-          _bookings.where((b) => b.status == BookingStatus.accepted).toList(),
-        'pending' =>
-          _bookings.where((b) => b.status == BookingStatus.pending).toList(),
-        'done' => _bookings.where((b) => b.isDone).toList(),
-        _ => List.of(_bookings),
-      });
+  Future<List<Booking>> bookings({String tab = 'all'}) {
+    _advanceSimulations();
+    return _delayed(switch (tab) {
+      'active' =>
+        _bookings.where((b) => b.status == BookingStatus.accepted).toList(),
+      'pending' =>
+        _bookings.where((b) => b.status == BookingStatus.pending).toList(),
+      'done' => _bookings.where((b) => b.isDone).toList(),
+      _ => List.of(_bookings),
+    });
+  }
+
+  /// Folds each simulated job's current state back onto its booking, so the
+  /// list reflects an acceptance the moment it happens — the same way a real
+  /// refetch would pick up the worker's response.
+  void _advanceSimulations() {
+    if (_jobs.isEmpty) return;
+    _bookings = [
+      for (final booking in _bookings)
+        switch (_jobs[booking.id]) {
+          final job? when job.hasAccepted => booking.copyWith(
+            status: BookingStatus.accepted,
+            jobStage: job.stage,
+          ),
+          _ => booking,
+        },
+    ];
+  }
 
   @override
   Future<Booking> createBooking({
@@ -156,8 +180,16 @@ class MockRepository implements KaamWalaRepository {
       notes: notes,
       status: BookingStatus.pending,
       jobStage: JobStage.pending,
+      site: GeoPoint.tryFrom(latitude, longitude) ?? Mock.home,
     );
     _bookings = [booking, ..._bookings];
+
+    // The request now sits with the worker. `_SimulatedJob` decides when they
+    // accept it and walks them in from wherever they were on the map.
+    _jobs[booking.id] = _SimulatedJob(
+      origin: labour.latLng ?? Mock.home,
+      destination: booking.site!,
+    );
     return _delayed(booking);
   }
 
@@ -171,6 +203,29 @@ class MockRepository implements KaamWalaRepository {
         if (b.id == bookingId) updated else b,
     ];
     return _delayed(updated);
+  }
+
+  @override
+  Future<TrackingUpdate> trackBooking(int bookingId) {
+    final booking = _bookings.firstWhere(
+      (b) => b.id == bookingId,
+      orElse: () =>
+          throw const ApiException('Ye booking nahi mili.', statusCode: 404),
+    );
+
+    // Bookings seeded as already-accepted have no simulation yet — start one
+    // the first time they're tracked, so the demo works without booking afresh.
+    final job = _jobs.putIfAbsent(
+      bookingId,
+      () => _SimulatedJob(
+        origin: Mock.labourById(booking.labour.id).latLng ?? Mock.home,
+        destination: booking.site ?? Mock.home,
+        acceptAfter: Duration.zero,
+      ),
+    );
+
+    _advanceSimulations();
+    return _delayed(job.sample());
   }
 
   @override
@@ -229,4 +284,73 @@ class MockRepository implements KaamWalaRepository {
 
   @override
   Future<List<SavedAddress>> addresses() => _delayed(Mock.addresses);
+}
+
+/// One worker travelling to one job, played out against the wall clock.
+///
+/// Nothing here is scheduled: every value is a function of elapsed time, so
+/// polling at any interval — or not polling for a while and coming back —
+/// always yields a consistent state. The durations are demo-paced (a job that
+/// would really take an hour plays out in about a minute) so the whole
+/// request → accept → arrive → work flow can be watched end to end.
+class _SimulatedJob {
+  _SimulatedJob({
+    required this.origin,
+    required this.destination,
+    this.acceptAfter = const Duration(seconds: 6),
+  }) : _startedAt = DateTime.now();
+
+  final GeoPoint origin;
+  final GeoPoint destination;
+
+  /// How long the worker "thinks about it" before accepting the request.
+  final Duration acceptAfter;
+
+  final DateTime _startedAt;
+
+  static const _travel = Duration(seconds: 55);
+
+  /// What the real trip would have taken — used to make the ETA count down
+  /// through plausible minute values rather than the compressed demo seconds.
+  static const _nominalTripMinutes = 14;
+
+  Duration get _elapsed => DateTime.now().difference(_startedAt);
+
+  bool get hasAccepted => _elapsed >= acceptAfter;
+
+  /// 0 at the moment of acceptance, 1 on arrival.
+  double get _progress {
+    if (!hasAccepted) return 0;
+    final travelled = _elapsed - acceptAfter;
+    return (travelled.inMilliseconds / _travel.inMilliseconds).clamp(0.0, 1.0);
+  }
+
+  JobStage get stage {
+    if (!hasAccepted) return JobStage.pending;
+    return _progress >= 1 ? JobStage.working : JobStage.onTheWay;
+  }
+
+  TrackingUpdate sample() {
+    // Before acceptance there is deliberately no position: the request is still
+    // sitting with the worker, and showing a dot would imply they're moving.
+    if (!hasAccepted) {
+      return TrackingUpdate(
+        stage: JobStage.pending,
+        destination: destination,
+        accepted: false,
+      );
+    }
+
+    final position = origin.lerpTo(destination, _progress);
+
+    return TrackingUpdate(
+      stage: stage,
+      position: position,
+      destination: destination,
+      distanceKm: position.distanceKmTo(destination),
+      etaMinutes: stage == JobStage.onTheWay
+          ? ((1 - _progress) * _nominalTripMinutes).ceil()
+          : 0,
+    );
+  }
 }

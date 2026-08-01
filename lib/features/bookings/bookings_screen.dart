@@ -278,6 +278,9 @@ class _BookingsScreenState extends State<BookingsScreen> {
               ).pushNamed(Routes.labourDetail, arguments: booking.labour.id),
               onCancel: () => _cancel(booking),
               onReview: () => _review(booking),
+              onTrack: () => Navigator.of(
+                context,
+              ).pushNamed(Routes.tracking, arguments: booking),
             ),
           ),
         );

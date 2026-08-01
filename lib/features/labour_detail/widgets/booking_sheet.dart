@@ -20,13 +20,17 @@ class BookingSheet extends StatefulWidget {
 
   final Labour labour;
 
-  static Future<bool?> show(BuildContext context, {required Labour labour}) =>
-      showModalBottomSheet<bool>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: AppColors.white,
-        builder: (_) => BookingSheet(labour: labour),
-      );
+  /// Resolves to the created booking, so the caller can take the user straight
+  /// to tracking rather than only knowing that *something* succeeded.
+  static Future<Booking?> show(
+    BuildContext context, {
+    required Labour labour,
+  }) => showModalBottomSheet<Booking>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: AppColors.white,
+    builder: (_) => BookingSheet(labour: labour),
+  );
 
   @override
   State<BookingSheet> createState() => _BookingSheetState();
@@ -101,7 +105,7 @@ class _BookingSheetState extends State<BookingSheet> {
     final user = context.session.user;
 
     try {
-      await context.repo.createBooking(
+      final booking = await context.repo.createBooking(
         labourId: widget.labour.id,
         skillId: widget.labour.skills.firstOrNull?.id,
         workDate: _selectedDate,
@@ -116,7 +120,7 @@ class _BookingSheetState extends State<BookingSheet> {
         notes: _notes.text.trim(),
       );
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(booking);
     } on Object catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);

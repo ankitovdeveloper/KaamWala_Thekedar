@@ -319,6 +319,94 @@ class _SkillChip extends StatelessWidget {
 }
 
 /// Compact sort picker — maps onto `?sort=distance|rating|price_low|price_high`.
+/// Radius on its own, reachable in one tap from the map.
+///
+/// It is also in [FilterSheet], but radius is the one parameter the map draws,
+/// so changing it wants a shorter path than opening the full filter form.
+class RadiusSheet extends StatefulWidget {
+  const RadiusSheet({super.key, required this.current});
+
+  final int current;
+
+  static Future<int?> show(BuildContext context, int current) =>
+      showModalBottomSheet<int>(
+        context: context,
+        backgroundColor: AppColors.white,
+        builder: (_) => RadiusSheet(current: current),
+      );
+
+  @override
+  State<RadiusSheet> createState() => _RadiusSheetState();
+}
+
+class _RadiusSheetState extends State<RadiusSheet> {
+  late int _km = widget.current;
+
+  /// The jumps people actually think in, rather than every integer.
+  static const _presets = [2, 5, 10, 25, 50];
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(Gap.x4l, 0, Gap.x4l, Gap.x3l),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text('Kitni door tak', style: AppType.h3)),
+                Text('$_km km', style: AppType.h3),
+              ],
+            ),
+            Gap.vMd,
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: AppColors.yellow,
+                inactiveTrackColor: AppColors.surfaceAlt,
+                thumbColor: AppColors.black,
+                overlayColor: AppColors.yellow.withValues(alpha: 0.2),
+                trackHeight: 5,
+              ),
+              child: Slider(
+                value: _km.clamp(1, 50).toDouble(),
+                min: 1,
+                max: 50,
+                divisions: 49,
+                onChanged: (v) => setState(() => _km = v.round()),
+              ),
+            ),
+            Gap.vMd,
+            Wrap(
+              spacing: Gap.md,
+              children: [
+                for (final preset in _presets)
+                  ChoiceChip(
+                    label: Text('$preset km'),
+                    labelStyle: AppType.buttonSmall.copyWith(fontSize: 12),
+                    selected: _km == preset,
+                    showCheckmark: false,
+                    backgroundColor: AppColors.white,
+                    selectedColor: AppColors.yellow,
+                    side: const BorderSide(color: AppColors.border),
+                    onSelected: (_) => setState(() => _km = preset),
+                  ),
+              ],
+            ),
+            Gap.v20,
+            KwButton(
+              label: 'Is area mein dhoondein',
+              onPressed: () => Navigator.of(context).pop(_km),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class SortSheet extends StatelessWidget {
   const SortSheet({super.key, required this.current});
 

@@ -4,6 +4,7 @@ import '../../core/animations/effects.dart';
 import '../../core/animations/entrance.dart';
 import '../../core/async/loadable.dart';
 import '../../core/responsive/responsive.dart';
+import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
@@ -86,11 +87,14 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
   Labour? get _labour => _detail.value ?? widget.preview;
 
   Future<void> _book(Labour labour) async {
-    final confirmed = await BookingSheet.show(context, labour: labour);
-    if (confirmed != true || !mounted) return;
+    final booking = await BookingSheet.show(context, labour: labour);
+    if (booking == null || !mounted) return;
 
     setState(() => _booked = true);
-    _toast('${labour.name} ki booking bhej di gayi');
+
+    // Straight into tracking: the request is now with the worker, and this is
+    // the screen that shows their answer arriving and then where they are.
+    Navigator.of(context).pushNamed(Routes.tracking, arguments: booking);
   }
 
   Future<void> _toggleSaved(Labour labour) async {

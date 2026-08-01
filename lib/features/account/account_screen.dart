@@ -95,8 +95,6 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Future<void> _pickLanguage(AccountSettings current) async {
-    const options = {'hi': 'Hindi', 'en': 'English'};
-
     final picked = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.white,
@@ -114,20 +112,20 @@ class _AccountScreenState extends State<AccountScreen> {
               step: const Duration(milliseconds: 40),
               offset: 10,
               children: [
-                for (final entry in options.entries)
+                for (final language in AppLanguage.values)
                   KwMenuRow(
                     icon: Icons.translate_rounded,
-                    label: entry.value,
+                    label: language.label,
                     showChevron: false,
-                    divider: entry.key != options.keys.last,
-                    trailing: entry.key == current.language
+                    divider: language != AppLanguage.values.last,
+                    trailing: language.wire == current.language
                         ? const Icon(
                             Icons.check_circle_rounded,
                             size: 20,
                             color: AppColors.yellowDark,
                           )
                         : null,
-                    onTap: () => Navigator.of(context).pop(entry.key),
+                    onTap: () => Navigator.of(context).pop(language.wire),
                   ),
               ],
             ),

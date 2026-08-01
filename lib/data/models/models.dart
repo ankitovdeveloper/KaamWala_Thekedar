@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 
 import '../api/api_client.dart';
@@ -68,6 +70,94 @@ enum LabourSort {
   const LabourSort(this.label, this.wire);
   final String label;
   final String wire;
+}
+
+/// Languages offered in Account Settings. `wire` is what `preferences.language`
+/// stores — ISO codes where one exists; Hinglish has none, so it travels as the
+/// `hi-en` pair.
+enum AppLanguage {
+  hindi('Hindi', 'hi'),
+  english('English', 'en'),
+  hinglish('Hinglish', 'hi-en'),
+  bhojpuri('Bhojpuri', 'bho');
+
+  const AppLanguage(this.label, this.wire);
+  final String label;
+  final String wire;
+
+  static AppLanguage parse(String? v) => AppLanguage.values.firstWhere(
+    (e) => e.wire == v,
+    orElse: () => AppLanguage.hindi,
+  );
+
+  static String labelOf(String? v) => parse(v).label;
+}
+
+/// A latitude/longitude pair.
+///
+/// Deliberately free of any map SDK type: the data layer, the mock repository
+/// and the widget tests all handle coordinates without pulling in
+/// `google_maps_flutter`, which cannot render in a test harness.
+@immutable
+class GeoPoint {
+  const GeoPoint(this.lat, this.lng);
+
+  final double lat;
+  final double lng;
+
+  static GeoPoint? tryFrom(double? lat, double? lng) =>
+      lat == null || lng == null ? null : GeoPoint(lat, lng);
+
+  static GeoPoint? fromJson(Map<String, dynamic>? json) => json == null
+      ? null
+      : GeoPoint.tryFrom(
+          json['latitude'] == null ? null : json.dbl('latitude'),
+          json['longitude'] == null ? null : json.dbl('longitude'),
+        );
+
+  /// Great-circle distance in km — the same haversine the API sorts by.
+  double distanceKmTo(GeoPoint other) {
+    const earthRadiusKm = 6371.0;
+    final dLat = _radians(other.lat - lat);
+    final dLng = _radians(other.lng - lng);
+    final a =
+        math.pow(math.sin(dLat / 2), 2) +
+        math.cos(_radians(lat)) *
+            math.cos(_radians(other.lat)) *
+            math.pow(math.sin(dLng / 2), 2);
+    return earthRadiusKm * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  }
+
+  /// Straight-line interpolation. Over the few hundred metres one poll covers,
+  /// the error against a great-circle path is not visible on screen.
+  GeoPoint lerpTo(GeoPoint other, double t) =>
+      GeoPoint(lat + (other.lat - lat) * t, lng + (other.lng - lng) * t);
+
+  /// Compass bearing to [other] in degrees, used to rotate the moving marker.
+  double bearingTo(GeoPoint other) {
+    final dLng = _radians(other.lng - lng);
+    final y = math.sin(dLng) * math.cos(_radians(other.lat));
+    final x =
+        math.cos(_radians(lat)) * math.sin(_radians(other.lat)) -
+        math.sin(_radians(lat)) *
+            math.cos(_radians(other.lat)) *
+            math.cos(dLng);
+    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+  }
+
+  static double _radians(double degrees) => degrees * math.pi / 180;
+
+  @override
+  bool operator ==(Object other) =>
+      other is GeoPoint && other.lat == lat && other.lng == lng;
+
+  @override
+  int get hashCode => Object.hash(lat, lng);
+
+  @override
+  String toString() =>
+      'GeoPoint(${lat.toStringAsFixed(5)}, '
+      '${lng.toStringAsFixed(5)})';
 }
 
 /// Turns a full name into the two-letter monogram every avatar uses.
@@ -205,12 +295,8 @@ class AppUser {
   String get fullPhone => '$countryCode $phone';
   String get initials => initialsOf(name);
 
-  /// `language` is stored as an ISO code; the settings row shows a label.
-  String get languageLabel => switch (language) {
-    'en' => 'English',
-    'pa' => 'Punjabi',
-    _ => 'Hindi',
-  };
+  /// `language` is stored as a wire code; the settings row shows a label.
+  String get languageLabel => AppLanguage.labelOf(language);
 
   AppUser copyWith({
     String? name,
@@ -348,6 +434,9 @@ class Labour {
 
   String get initials => initialsOf(name);
 
+  /// Null for a worker the API has no coordinates for — the map skips them.
+  GeoPoint? get latLng => GeoPoint.tryFrom(latitude, longitude);
+
   String get primarySkill => skills.isEmpty ? 'Kaam wala' : skills.first.name;
 
   String? get distanceLabel => distanceKm == null
@@ -424,6 +513,7 @@ class Booking {
     this.notes,
     this.hasReview = false,
     this.labourPhone,
+    this.site,
   });
 
   final int id;
@@ -443,6 +533,10 @@ class Booking {
   final String? notes;
   final bool hasReview;
   final String? labourPhone;
+
+  /// Where the job is. Tracking draws the worker moving towards this; null on
+  /// bookings created before coordinates were captured.
+  final GeoPoint? site;
 
   factory Booking.fromJson(Map<String, dynamic> json) {
     final labourJson = json.mapOrNull('labour');
@@ -470,6 +564,7 @@ class Booking {
       notes: json.strOrNull('notes'),
       hasReview: json['review'] != null,
       labourPhone: labourJson?.strOrNull('phone'),
+      site: GeoPoint.fromJson(json),
     );
   }
 
@@ -518,11 +613,20 @@ class Booking {
     return '$hour12:$minute $suffix';
   }
 
-  Booking copyWith({BookingStatus? status, bool? hasReview}) => Booking(
+  /// True once the worker has accepted and the job has not wrapped up — the
+  /// window in which live tracking is worth polling for.
+  bool get isTrackable =>
+      status == BookingStatus.accepted && jobStage != JobStage.completed;
+
+  Booking copyWith({
+    BookingStatus? status,
+    JobStage? jobStage,
+    bool? hasReview,
+  }) => Booking(
     id: id,
     labour: labour,
     status: status ?? this.status,
-    jobStage: jobStage,
+    jobStage: jobStage ?? this.jobStage,
     price: price,
     skillName: skillName,
     workDate: workDate,
@@ -533,7 +637,59 @@ class Booking {
     notes: notes,
     hasReview: hasReview ?? this.hasReview,
     labourPhone: labourPhone,
+    site: site,
   );
+}
+
+/// `GET /thekedar/bookings/{id}/track` — one poll of where the worker is.
+///
+/// Polled rather than pushed: a GET every few seconds needs no socket
+/// infrastructure on the Laravel side, and the marker interpolates between
+/// polls so the movement still reads as continuous.
+@immutable
+class TrackingUpdate {
+  const TrackingUpdate({
+    required this.stage,
+    this.position,
+    this.destination,
+    this.etaMinutes,
+    this.distanceKm,
+    this.accepted = true,
+  });
+
+  /// False while the request is still with the worker.
+  final bool accepted;
+
+  final JobStage stage;
+
+  /// Where the worker is right now, or null before they have accepted — the
+  /// request is still out and there is no one to follow yet.
+  final GeoPoint? position;
+
+  /// The job site. Repeated on every poll so the map can draw the target
+  /// without also holding the booking.
+  final GeoPoint? destination;
+  final int? etaMinutes;
+  final double? distanceKm;
+
+  factory TrackingUpdate.fromJson(Map<String, dynamic> json) => TrackingUpdate(
+    stage: JobStage.parse(json.strOrNull('job_stage')),
+    position: GeoPoint.fromJson(json.mapOrNull('position')),
+    destination: GeoPoint.fromJson(json.mapOrNull('destination')),
+    etaMinutes: json['eta_minutes'] == null ? null : json.intVal('eta_minutes'),
+    distanceKm: json['distance_km'] == null ? null : json.dbl('distance_km'),
+    accepted: json.strOrNull('status') == 'accepted',
+  );
+
+  /// "8 min door" / "Kaam shuru ho gaya" — the tracking card's headline.
+  String get etaLabel {
+    if (!accepted) return 'Accept ka intezaar';
+    if (stage == JobStage.working) return 'Kaam shuru ho gaya';
+    if (stage == JobStage.completed) return 'Kaam poora hua';
+    final eta = etaMinutes;
+    if (eta == null) return 'Raaste mein';
+    return eta <= 1 ? 'Bas pahunchne wala hai' : '$eta min door';
+  }
 }
 
 /// `Address` — the labelled locations on the Profile screen.
@@ -657,11 +813,7 @@ class AccountSettings {
     );
   }
 
-  String get languageLabel => switch (language) {
-    'en' => 'English',
-    'pa' => 'Punjabi',
-    _ => 'Hindi',
-  };
+  String get languageLabel => AppLanguage.labelOf(language);
 
   AccountSettings copyWith({
     String? language,

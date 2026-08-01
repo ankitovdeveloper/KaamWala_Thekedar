@@ -10,7 +10,8 @@
 abstract final class ApiConfig {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000/api/v1',
+    defaultValue: 'https://apps.ovsofts.com/RR/api/v1',
+    // defaultValue: 'http://127.0.0.1:8000/api/v1',
   );
 
   /// Forces the mock repository even when a base URL is present — handy for
@@ -29,4 +30,21 @@ abstract final class ApiConfig {
   static const fallbackLat = 28.4595; // Gurgaon
   static const fallbackLng = 77.0266;
   static const defaultRadiusKm = 25;
+
+  /// Google Maps JS / SDK key, supplied at build time so it never lands in
+  /// source control:
+  /// ```
+  /// flutter run -d chrome --dart-define=GOOGLE_MAPS_API_KEY=AIza...
+  /// ```
+  /// Empty means "no key configured" — the map falls back to the stylised
+  /// canvas rather than showing Google's grey error tiles, which also keeps
+  /// widget tests renderable.
+  static const mapsApiKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
+
+  static bool get hasMapsKey => mapsApiKey.isNotEmpty;
+
+  /// How often `GET /thekedar/bookings/{id}/track` is polled while a job is
+  /// live. Between polls the marker animates to the new position, so this is
+  /// a data-freshness knob, not a smoothness one.
+  static const trackingPollInterval = Duration(seconds: 4);
 }

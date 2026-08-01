@@ -71,6 +71,10 @@ abstract interface class KaamWalaRepository {
   /// `POST /thekedar/bookings/{id}/cancel`
   Future<Booking> cancelBooking(int bookingId);
 
+  /// `GET /thekedar/bookings/{id}/track` — one sample of the worker's
+  /// position. Callers poll this; see `TrackingSession`.
+  Future<TrackingUpdate> trackBooking(int bookingId);
+
   /// `POST /thekedar/bookings/{id}/review`
   Future<void> reviewBooking({
     required int bookingId,

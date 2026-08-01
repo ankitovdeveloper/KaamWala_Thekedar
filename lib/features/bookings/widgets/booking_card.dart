@@ -16,6 +16,7 @@ class BookingCard extends StatelessWidget {
     required this.onDetails,
     required this.onCancel,
     required this.onReview,
+    required this.onTrack,
   });
 
   final Booking booking;
@@ -23,6 +24,7 @@ class BookingCard extends StatelessWidget {
   final VoidCallback onDetails;
   final VoidCallback onCancel;
   final VoidCallback onReview;
+  final VoidCallback onTrack;
 
   (String, KwStatusTone) get _status => switch (booking.status) {
     BookingStatus.accepted => ('Confirmed', KwStatusTone.confirmed),
@@ -160,6 +162,15 @@ class BookingCard extends StatelessWidget {
   List<Widget> _actions() {
     return switch (booking.status) {
       BookingStatus.accepted => [
+        // Only offered while there is something to watch — a finished job has
+        // no position left to follow.
+        if (booking.isTrackable)
+          KwChipButton(
+            label: 'Live track',
+            icon: Icons.near_me_rounded,
+            filled: true,
+            onPressed: onTrack,
+          ),
         KwChipButton(
           label: 'Call',
           icon: Icons.phone_outlined,

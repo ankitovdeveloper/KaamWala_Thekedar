@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  # Lets you kick off a build by hand from the Actions tab.
+  workflow_dispatch:
+
+# A new push to the same branch makes the previous run pointless — cancel it
+# rather than queueing builds behind each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned to the version this project is developed against; a silent bump on
+  # the `stable` channel is the usual cause of a green machine going red.
+  FLUTTER_VERSION: "3.44.4"
+
+jobs:
+  verify:
+    name: Analyze & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+  build-web:
+    name: Build web
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # The Maps key is a repo secret, never a committed value. With the secret
+      # unset the build still succeeds — the app falls back to its stylised map.
+      #
+      # Each define is added only when it has a value: passing an empty
+      # `--dart-define=API_BASE_URL=` would override the in-app default with an
+      # empty string rather than leaving it alone.
+      - name: Build web
+        env:
+          MAPS_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          defines=()
+          [ -n "$MAPS_KEY" ] && defines+=("--dart-define=GOOGLE_MAPS_API_KEY=$MAPS_KEY")
+          [ -n "$API_BASE_URL" ] && defines+=("--dart-define=API_BASE_URL=$API_BASE_URL")
+          flutter build web --release "${defines[@]}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: build/web
+          retention-days: 14
+
+  build-android:
+    name: Build Android APK
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Two places, on purpose: the dart-define is what makes the app decide to
+      # render a real map, while MAPS_API_KEY is what Gradle puts in the
+      # manifest for the Maps SDK to authenticate with.
+      #
+      # Debug-signed: android/app/build.gradle.kts still points release at the
+      # debug keystore, so this installs for testing but is not Play-ready.
+      - name: Build APK
+        env:
+          # Read by Gradle and written into the manifest.
+          MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          defines=()
+          [ -n "$MAPS_API_KEY" ] && defines+=("--dart-define=GOOGLE_MAPS_API_KEY=$MAPS_API_KEY")
+          [ -n "$API_BASE_URL" ] && defines+=("--dart-define=API_BASE_URL=$API_BASE_URL")
+          flutter build apk --release "${defines[@]}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14

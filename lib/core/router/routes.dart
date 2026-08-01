@@ -5,6 +5,7 @@ import '../../features/auth/login_screen.dart';
 import '../../features/auth/otp_screen.dart';
 import '../../features/labour_detail/labour_detail_screen.dart';
 import '../../features/shell/home_shell.dart';
+import '../../features/tracking/tracking_screen.dart';
 import '../theme/app_theme.dart';
 
 abstract final class Routes {
@@ -12,6 +13,7 @@ abstract final class Routes {
   static const otp = '/otp';
   static const home = '/home';
   static const labourDetail = '/labour';
+  static const tracking = '/track';
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) =>
       switch (settings.name) {
@@ -31,6 +33,10 @@ abstract final class Routes {
           final int id => LabourDetailScreen(labourId: id),
           _ => const SizedBox.shrink(),
         }, settings),
+        tracking => _slideUp(
+          TrackingScreen(booking: settings.arguments! as Booking),
+          settings,
+        ),
         _ => null,
       };
 

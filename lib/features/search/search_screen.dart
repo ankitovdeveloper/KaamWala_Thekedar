@@ -21,7 +21,7 @@ import '../../widgets/kw_scaffold.dart';
 import '../labour_detail/labour_detail_screen.dart';
 import 'widgets/filter_sheet.dart';
 import 'widgets/labour_card.dart';
-import 'widgets/map_canvas.dart';
+import 'widgets/search_map.dart';
 
 /// Map + list backed by `GET /v1/thekedar/labour`.
 class SearchScreen extends StatefulWidget {
@@ -66,19 +66,19 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// Search origin. Falls back to the configured city centre until a location
   /// plugin is wired in; the user's saved coordinates win when present.
-  (double lat, double lng) get _origin {
+  GeoPoint get _origin {
     final user = context.session.user;
-    return (
+    return GeoPoint(
       user?.latitude ?? ApiConfig.fallbackLat,
       user?.longitude ?? ApiConfig.fallbackLng,
     );
   }
 
   Future<List<Labour>> _fetch() async {
-    final (lat, lng) = _origin;
+    final origin = _origin;
     final rows = await context.repo.searchLabours(
-      lat: lat,
-      lng: lng,
+      lat: origin.lat,
+      lng: origin.lng,
       skillId: _filters.skillId,
       query: _search,
       radiusKm: _filters.radiusKm,
@@ -284,13 +284,26 @@ class _SearchScreenState extends State<SearchScreen> {
       children: [
         Stack(
           children: [
-            SizedBox(
+            SearchMap(
+              origin: _origin,
+              radiusKm: _filters.radiusKm,
+              labours: rows,
+              selectedId: _selectedId,
               height: mapHeight,
-              child: MapCanvas(
-                labours: rows,
-                selectedId: _selectedId,
-                height: mapHeight,
-                onPinTap: _openDetail,
+              onPinTap: _openDetail,
+            ),
+            // Radius is what the map is actually showing, so it gets a control
+            // on the map rather than living only inside the filter sheet.
+            Positioned(
+              right: Gap.xxl,
+              bottom: Gap.xl,
+              child: AnimatedOpacity(
+                duration: Motion.fast,
+                opacity: (1 - _collapse * 1.4).clamp(0.0, 1.0),
+                child: IgnorePointer(
+                  ignoring: _collapse > 0.6,
+                  child: _radiusChip(),
+                ),
               ),
             ),
             Positioned(
@@ -320,6 +333,47 @@ class _SearchScreenState extends State<SearchScreen> {
         Expanded(child: _list(rows)),
       ],
     );
+  }
+
+  /// Shows the radius the circle on the map represents, and opens a slider to
+  /// change it. Kept to one tap because it is the control users reach for most.
+  Widget _radiusChip() {
+    return Pressable(
+      scale: 0.93,
+      onTap: _openRadius,
+      semanticLabel: 'Search radius badlein',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: Gap.xl, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: Radii.rPill,
+          border: Border.all(color: AppColors.border),
+          boxShadow: AppColors.floatingShadow,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.my_location_rounded,
+              size: 14,
+              color: AppColors.black,
+            ),
+            Gap.hXs,
+            Text(
+              '${_filters.radiusKm} km',
+              style: AppType.buttonSmall.copyWith(fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openRadius() async {
+    final picked = await RadiusSheet.show(context, _filters.radiusKm);
+    if (picked == null || !mounted || picked == _filters.radiusKm) return;
+    setState(() => _filters = _filters.copyWith(radiusKm: picked));
+    _results.refetchWith(_fetch);
   }
 
   Widget _filterButton() {

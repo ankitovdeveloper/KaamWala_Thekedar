@@ -161,6 +161,12 @@ class ApiRepository implements KaamWalaRepository {
   );
 
   @override
+  Future<TrackingUpdate> trackBooking(int bookingId) async =>
+      TrackingUpdate.fromJson(
+        _obj(await _api.get('thekedar/bookings/$bookingId/track')),
+      );
+
+  @override
   Future<void> reviewBooking({
     required int bookingId,
     required int rating,

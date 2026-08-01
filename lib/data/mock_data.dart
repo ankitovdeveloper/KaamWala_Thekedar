@@ -199,6 +199,10 @@ abstract final class Mock {
     return DateTime(n.year, n.month, n.day);
   }
 
+  /// The thekedar's own location — the job site for every seeded booking, and
+  /// the point the tracked worker walks towards.
+  static const home = GeoPoint(28.4595, 77.0266);
+
   static List<Booking> bookings() => [
     Booking(
       id: 101,
@@ -211,6 +215,7 @@ abstract final class Mock {
       address: 'Sector 14, Gurgaon',
       status: BookingStatus.accepted,
       jobStage: JobStage.onTheWay,
+      site: home,
     ),
     Booking(
       id: 102,
@@ -223,6 +228,7 @@ abstract final class Mock {
       address: 'Sector 14, Gurgaon',
       status: BookingStatus.pending,
       jobStage: JobStage.pending,
+      site: home,
     ),
     Booking(
       id: 103,
