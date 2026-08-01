@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (_digits.length != 10) {
       setState(() {
-        _error = 'Poora 10-digit number daalein';
+        _error = context.s.phoneInvalid;
         _shake++;
       });
       HapticFeedback.heavyImpact();
@@ -80,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _shake++;
       });
       HapticFeedback.heavyImpact();
-      if (_error == null) _toast(describeError(e));
+      if (_error == null) _toast(describeError(context, e));
     }
   }
 
@@ -94,6 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     // A short viewport (landscape phone) drops the tagline and tightens gaps.
     final compactHeight = context.isShort;
+    final s = context.s;
 
     return KwScaffold(
       headerColor: AppColors.yellow,
@@ -121,20 +122,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       SizedBox(height: compactHeight ? 24 : 36),
                       FadeSlideIn(
                         delay: const Duration(milliseconds: 180),
-                        child: Text('Welcome back 👋', style: AppType.h1),
+                        child: Text(s.loginWelcome, style: AppType.h1),
                       ),
                       Gap.vSm,
                       FadeSlideIn(
                         delay: const Duration(milliseconds: 240),
                         child: Text(
-                          'Apna phone number enter karein, OTP aayega',
+                          s.loginSubtitle,
                           style: AppType.bodyMuted,
                         ),
                       ),
                       SizedBox(height: compactHeight ? 20 : 28),
                       FadeSlideIn(
                         delay: const Duration(milliseconds: 300),
-                        child: const KwFieldLabel('Phone Number'),
+                        child: KwFieldLabel(s.phoneNumber),
                       ),
                       FadeSlideIn(
                         delay: const Duration(milliseconds: 340),
@@ -144,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       FadeSlideIn(
                         delay: const Duration(milliseconds: 400),
                         child: KwButton(
-                          label: 'OTP Bhejo',
+                          label: s.sendOtp,
                           icon: Icons.send_rounded,
                           busy: _busy,
                           onPressed: _sendOtp,
@@ -164,10 +165,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       FadeSlideIn(
                         delay: const Duration(milliseconds: 550),
                         child: KwButton(
-                          label: 'Google se login karein',
+                          label: s.googleLogin,
                           icon: Icons.g_mobiledata_rounded,
                           variant: KwButtonVariant.outline,
-                          onPressed: () => _todo(context, 'Google Sign-In'),
+                          onPressed: () => _todo(context, s.googleSignIn),
                         ),
                       ),
                     ],
@@ -185,8 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: FadeSlideIn(
                 delay: const Duration(milliseconds: 640),
                 child: Text(
-                  'Aage badhne ka matlab hai aap Terms aur '
-                  'Privacy Policy se sehmat hain',
+                  s.termsLine,
                   textAlign: TextAlign.center,
                   style: AppType.micro.copyWith(height: 1.5),
                 ),
@@ -199,6 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _brand(bool compactHeight) {
+    final s = context.s;
     return Row(
       children: [
         FadeSlideIn(
@@ -240,14 +241,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 delay: const Duration(milliseconds: 90),
                 from: SlideFrom.left,
                 offset: 12,
-                child: Text('KaamWala', style: AppType.h3),
+                child: Text(s.appName, style: AppType.h3),
               ),
               if (!compactHeight)
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 140),
                   from: SlideFrom.left,
                   offset: 12,
-                  child: Text('Book labour instantly', style: AppType.caption),
+                  child: Text(s.tagline, style: AppType.caption),
                 ),
             ],
           ),
@@ -286,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Expanded(
           child: KwTextField(
             controller: _phone,
-            hintText: '98765 43210',
+            hintText: context.s.phoneHint,
             keyboardType: TextInputType.phone,
             errorText: _error,
             textInputAction: TextInputAction.done,
@@ -315,18 +316,19 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _registerLine() {
+    final s = context.s;
     // Wrap so the prompt and the link stack on a narrow screen or at a large
     // font scale instead of colliding.
     return Wrap(
       alignment: WrapAlignment.center,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text('Naya user? ', style: AppType.caption.copyWith(fontSize: 13)),
+        Text(s.newUserPrompt, style: AppType.caption.copyWith(fontSize: 13)),
         Pressable(
           scale: 0.94,
-          onTap: () => _todo(context, 'Registration'),
+          onTap: () => _todo(context, s.registration),
           child: Text(
-            'Register karein',
+            s.register,
             style: AppType.bodyStrong.copyWith(
               fontSize: 13,
               decoration: TextDecoration.underline,
@@ -343,7 +345,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Gap.lg),
-          child: Text('ya', style: AppType.caption),
+          child: Text(context.s.or, style: AppType.caption),
         ),
         const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
       ],
@@ -353,7 +355,7 @@ class _LoginScreenState extends State<LoginScreen> {
   static void _todo(BuildContext context, String what) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$what jald aayega')));
+      ..showSnackBar(SnackBar(content: Text(context.s.comingSoon(what))));
   }
 }
 

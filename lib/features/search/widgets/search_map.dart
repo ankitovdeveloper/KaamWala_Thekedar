@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/models.dart';
+import '../../../data/session.dart';
 import '../../../widgets/kw_map.dart';
 import 'map_canvas.dart';
 
@@ -77,12 +78,14 @@ class _SearchMapState extends State<SearchMap> {
     );
   }
 
-  Set<Marker> get _markers => {
+  Set<Marker> get _markers {
+    final s = context.s;
+    return {
     Marker(
       markerId: const MarkerId('origin'),
       position: widget.origin.toLatLng(),
       icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-      infoWindow: const InfoWindow(title: 'Aap yahan hain'),
+      infoWindow: InfoWindow(title: s.youAreHere),
       zIndexInt: 2,
     ),
     for (final labour in widget.labours)
@@ -97,11 +100,14 @@ class _SearchMapState extends State<SearchMap> {
           ),
           infoWindow: InfoWindow(
             title: labour.name,
-            snippet: '₹${labour.dailyRate}/din · ${labour.primarySkill}',
+            snippet:
+                '₹${labour.dailyRate}${s.perDay} · '
+                '${labour.primarySkillIn(s)}',
           ),
           onTap: () => widget.onPinTap(labour),
         ),
-  };
+    };
+  }
 
   Set<Circle> get _circles => {
     Circle(

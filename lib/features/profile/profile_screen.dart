@@ -13,7 +13,9 @@ import '../../widgets/kw_async.dart';
 import '../../widgets/kw_button.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
+import '../location/location_picker_screen.dart';
 import '../shell/home_shell.dart';
+import 'edit_profile_screen.dart';
 
 /// Profile screen, backed by `GET /v1/thekedar/profile` — one call returns the
 /// user, the dashboard stats and the saved addresses.
@@ -48,6 +50,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _scroll.dispose();
     _profile.dispose();
     super.dispose();
+  }
+
+  Future<void> _editProfile(AppUser user) async {
+    final updated = await EditProfileScreen.push(context, user);
+    if (updated == null || !mounted) return;
+    // The form already wrote through to the session; refresh the bundle so
+    // the hero and the address list match what was just saved.
+    _profile.load(silent: true);
+  }
+
+  Future<void> _editAddress() async {
+    final saved = await LocationPickerScreen.push(context);
+    if (saved != true || !mounted) return;
+    _profile.load(silent: true);
   }
 
   @override
@@ -95,6 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _content(ProfileBundle bundle) {
+    final s = context.s;
     // Same parallax treatment as the labour detail hero.
     final parallax = (_offset * 0.45).clamp(0.0, 200.0);
     final fade = (1 - _offset / 170).clamp(0.0, 1.0);
@@ -128,15 +145,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   _statsRow(bundle.stats),
                   Gap.vXxl,
-                  const KwSectionTitle('Meri Activity'),
+                  KwSectionTitle(s.myActivity),
                   KwMenuCard(
                     children: [
                       KwMenuRow(
                         icon: Icons.calendar_month_outlined,
-                        label: 'Active Bookings',
+                        label: s.activeBookings,
                         subtitle: bundle.stats.activeBookings == 0
-                            ? 'Abhi koi booking nahi'
-                            : '${bundle.stats.activeBookings} bookings chal rahi hain',
+                            ? s.noBookingsYet
+                            : s.bookingsRunning(bundle.stats.activeBookings),
                         trailing: bundle.stats.activeBookings == 0
                             ? null
                             : KwBadge(label: '${bundle.stats.activeBookings}'),
@@ -144,39 +161,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       KwMenuRow(
                         icon: Icons.favorite_border_rounded,
-                        label: 'Saved Labour',
-                        subtitle: '${bundle.stats.savedLabours} log saved hain',
-                        onTap: () => _toast('Saved list jald aayegi'),
+                        label: s.savedLabour,
+                        subtitle: s.savedLabourCount(bundle.stats.savedLabours),
+                        onTap: () => _toast(s.savedListSoon),
                       ),
                       KwMenuRow(
                         icon: Icons.star_outline_rounded,
-                        label: 'Meri Reviews',
-                        subtitle:
-                            '${bundle.stats.reviewsGiven} reviews diye hain',
+                        label: s.myReviews,
+                        subtitle: s.reviewsGivenCount(
+                          bundle.stats.reviewsGiven,
+                        ),
                         divider: false,
-                        onTap: () => _toast('Reviews page jald aayega'),
+                        onTap: () => _toast(s.reviewsPageSoon),
                       ),
                     ],
                   ),
-                  const KwSectionTitle('Address'),
+                  KwSectionTitle(s.addressSection),
                   KwMenuCard(
                     children: [
+                      // The user's own coordinates come first: this is the row
+                      // that decides where Search looks, so it is the one they
+                      // are most likely to be after.
+                      KwMenuRow(
+                        icon: Icons.my_location_rounded,
+                        label: s.locationTitle,
+                        subtitle:
+                            bundle.user.address ??
+                            bundle.user.city ??
+                            s.setLocation,
+                        onTap: _editAddress,
+                      ),
                       for (final address in bundle.addresses)
                         KwMenuRow(
                           icon: address.icon,
                           label: address.label,
                           subtitle: address.line,
                           trailing: address.isDefault
-                              ? const KwBadge(label: 'Default')
+                              ? KwBadge(label: s.defaultBadge)
                               : null,
-                          onTap: () => _toast('${address.label} edit karein'),
+                          onTap: _editAddress,
                         ),
                       KwMenuRow(
                         icon: Icons.add_rounded,
-                        label: 'Naya address add karein',
+                        label: s.addNewAddress,
                         showChevron: false,
                         divider: false,
-                        onTap: () => _toast('Address add jald aayega'),
+                        onTap: () => _toast(s.addressAddSoon),
                       ),
                     ],
                   ),
@@ -190,6 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _hero(AppUser user) {
+    final s = context.s;
     return Container(
       width: double.infinity,
       color: AppColors.yellow,
@@ -204,11 +235,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 KwIconButton(
                   icon: Icons.ios_share_rounded,
-                  tooltip: 'Profile share karein',
+                  tooltip: s.shareProfile,
                   onPressed: () => _toast(
                     user.referralCode == null
-                        ? 'Referral code jald aayega'
-                        : 'Referral code: ${user.referralCode}',
+                        ? s.referralCodeSoon
+                        : s.referralCodeIs(user.referralCode!),
                   ),
                 ),
               ],
@@ -249,12 +280,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               delay: const Duration(milliseconds: 180),
               offset: 10,
               child: KwButton(
-                label: 'Profile Edit karein',
+                label: s.editProfile,
                 icon: Icons.edit_outlined,
                 variant: KwButtonVariant.ghost,
                 size: KwButtonSize.small,
                 expand: false,
-                onPressed: () => _toast('Profile edit jald aayega'),
+                onPressed: () => _editProfile(user),
               ),
             ),
           ],
@@ -264,6 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _statsRow(ThekedarStats stats) {
+    final s = context.s;
     // IntrinsicHeight lets the three boxes match the tallest one. Without it,
     // CrossAxisAlignment.stretch has no height to stretch to inside a sliver.
     return IntrinsicHeight(
@@ -273,7 +305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(
             child: _StatBox(
               value: stats.totalBookings,
-              label: 'Total Bookings',
+              label: s.statTotalBookings,
               delay: const Duration(milliseconds: 220),
             ),
           ),
@@ -281,7 +313,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(
             child: _StatBox(
               value: stats.totalSpend,
-              label: 'Total Spend',
+              label: s.statTotalSpend,
               prefix: '₹',
               grouped: true,
               highlight: true,
@@ -292,7 +324,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(
             child: _StatBox(
               value: stats.reviewsGiven,
-              label: 'Reviews Diye',
+              label: s.statReviewsGiven,
               delay: const Duration(milliseconds: 380),
             ),
           ),

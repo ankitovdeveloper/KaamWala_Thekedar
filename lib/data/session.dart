@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/i18n/app_strings.dart';
 import 'api/api_client.dart';
 import 'api/api_config.dart';
 import 'models/models.dart';
@@ -31,6 +32,7 @@ class Session extends ChangeNotifier {
 
   static const _tokenKey = 'kw.auth.token';
   static const _userKey = 'kw.auth.user';
+  static const _languageKey = 'kw.pref.language';
 
   final ApiClient? _client;
   late final KaamWalaRepository _repository;
@@ -39,6 +41,27 @@ class Session extends ChangeNotifier {
 
   AppUser? _user;
   AppUser? get user => _user;
+
+  /// Language for anyone not signed in yet — the login and OTP screens have no
+  /// user to read `users.language` from, so the last choice is kept locally.
+  String _localLanguage = AppLanguage.hinglish.wire;
+
+  /// The signed-in user's language wins; before that, the local preference.
+  String get language => _user?.language ?? _localLanguage;
+
+  /// String table for [language]. Read through `context.s` from widgets.
+  AppStrings get strings => AppStrings.forCode(language);
+
+  /// Switches language without a signed-in user (or ahead of the server round
+  /// trip). Account Settings still persists the choice through
+  /// `PUT /thekedar/account/preferences`; this only keeps the UI in step.
+  Future<void> setLanguage(String code) async {
+    if (code == _localLanguage && _user == null) return;
+    _localLanguage = code;
+    if (_user != null) _user = _user!.copyWith(language: code);
+    notifyListeners();
+    await _persistLanguage(code);
+  }
 
   bool _restored = false;
 
@@ -63,6 +86,11 @@ class Session extends ChangeNotifier {
       final token = prefs.getString(_tokenKey);
       final cached = prefs.getString(_userKey);
 
+      // Language first: the login screen must already be in the right language
+      // even when there is no token to restore.
+      final saved = prefs.getString(_languageKey);
+      if (saved != null && saved.isNotEmpty) _localLanguage = saved;
+
       if (token != null && token.isNotEmpty) {
         _client.setToken(token);
         if (cached != null) {
@@ -86,6 +114,9 @@ class Session extends ChangeNotifier {
 
   Future<void> signIn(AuthResult result) async {
     _user = result.user;
+    // Carry the account's language into the local preference so logging out
+    // doesn't snap the login screen back to the default.
+    _localLanguage = result.user.language;
     _client?.setToken(result.token);
     notifyListeners();
 
@@ -115,6 +146,7 @@ class Session extends ChangeNotifier {
   /// Keeps the cached user in step after a profile or preferences change.
   void updateUser(AppUser user) {
     _user = user;
+    _localLanguage = user.language;
     unawaited(_persistUser(user));
     notifyListeners();
   }
@@ -142,8 +174,21 @@ class Session extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_userKey, jsonEncode(user.toJson()));
+      // Mirror the language so the next cold start renders the login screen
+      // correctly before the cached user has been read back.
+      await prefs.setString(_languageKey, user.language);
     } on Object {
       // Caching the user is an optimisation, not a requirement.
+    }
+  }
+
+  Future<void> _persistLanguage(String code) async {
+    if (_client == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_languageKey, code);
+    } on Object {
+      // Falls back to the default on the next start; not worth failing over.
     }
   }
 
@@ -186,4 +231,15 @@ extension SessionContext on BuildContext {
 
   /// The repository, without subscribing to session changes.
   KaamWalaRepository get repo => SessionScope.read(this).repo;
+
+  /// Localised strings for the current user's language.
+  ///
+  /// Subscribes to the session, so changing the language in Account Settings
+  /// rebuilds every screen that reads this. Outside a [SessionScope] — a
+  /// widget pumped bare in a test — it falls back to the base (Hinglish)
+  /// table rather than asserting.
+  AppStrings get s {
+    final scope = dependOnInheritedWidgetOfExactType<SessionScope>();
+    return scope?.notifier?.strings ?? AppStrings.hinglish;
+  }
 }

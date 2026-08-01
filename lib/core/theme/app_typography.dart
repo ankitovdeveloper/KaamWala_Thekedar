@@ -14,6 +14,12 @@ abstract final class AppType {
     'San Francisco',
     'Helvetica Neue',
     'Arial',
+    // Hindi and Bhojpuri render in Devanagari, which none of the Latin faces
+    // above cover. Named explicitly so the shaper picks a real Devanagari font
+    // instead of falling through to tofu boxes on desktop targets.
+    'Noto Sans Devanagari',
+    'Nirmala UI',
+    'Mangal',
     'sans-serif',
   ];
 

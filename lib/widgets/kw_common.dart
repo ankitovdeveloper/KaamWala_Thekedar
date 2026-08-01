@@ -6,6 +6,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/app_typography.dart';
+import '../data/session.dart';
 
 /// White rounded surface with the hairline border used across every screen.
 class KwCard extends StatelessWidget {
@@ -355,7 +356,7 @@ class KwAvailability extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!available && label == null) return const SizedBox.shrink();
     final color = available ? AppColors.success : AppColors.muted;
-    final text = label ?? (available ? 'Available' : 'Busy');
+    final text = label ?? (available ? context.s.available : context.s.busy);
 
     Widget dot = Container(
       width: 7,

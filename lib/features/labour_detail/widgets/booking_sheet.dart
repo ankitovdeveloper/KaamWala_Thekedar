@@ -65,35 +65,11 @@ class _BookingSheetState extends State<BookingSheet> {
     super.dispose();
   }
 
-  static const _weekdays = [
-    'Som',
-    'Mangal',
-    'Budh',
-    'Guru',
-    'Shukr',
-    'Shani',
-    'Ravi',
-  ];
-  static const _months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-
   DateTime get _selectedDate => DateTime.now().add(Duration(days: _dayOffset));
 
   Future<void> _submit() async {
     if (_address.text.trim().isEmpty) {
-      setState(() => _addressError = 'Kaam ka address daalein');
+      setState(() => _addressError = context.s.addressRequired);
       return;
     }
 
@@ -126,12 +102,14 @@ class _BookingSheetState extends State<BookingSheet> {
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(describeError(e))));
+        ..showSnackBar(SnackBar(content: Text(describeError(context, e))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
+
     return SafeArea(
       top: false,
       child: SingleChildScrollView(
@@ -164,7 +142,7 @@ class _BookingSheetState extends State<BookingSheet> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          widget.labour.primarySkill,
+                          widget.labour.primarySkillIn(s),
                           style: AppType.caption,
                         ),
                       ],
@@ -173,7 +151,7 @@ class _BookingSheetState extends State<BookingSheet> {
                 ],
               ),
               Gap.v24,
-              const KwSectionTitle('Kis din chahiye'),
+              KwSectionTitle(s.whichDay),
               SizedBox(
                 height: 74,
                 child: ListView.separated(
@@ -184,12 +162,12 @@ class _BookingSheetState extends State<BookingSheet> {
                     final date = DateTime.now().add(Duration(days: i));
                     return _DayChip(
                       weekday: i == 0
-                          ? 'Aaj'
+                          ? s.today
                           : i == 1
-                          ? 'Kal'
-                          : _weekdays[date.weekday - 1],
+                          ? s.tomorrow
+                          : s.weekdaysShort[date.weekday - 1],
                       day: '${date.day}',
-                      month: _months[date.month - 1],
+                      month: s.monthsShort[date.month - 1],
                       selected: i == _dayOffset,
                       onTap: () => setState(() => _dayOffset = i),
                     );
@@ -197,13 +175,13 @@ class _BookingSheetState extends State<BookingSheet> {
                 ),
               ),
               Gap.v20,
-              const KwSectionTitle('Kitna kaam'),
+              KwSectionTitle(s.howMuchWork),
               Row(
                 children: [
                   Expanded(
                     child: _TypeChip(
-                      label: 'Full day',
-                      sub: '8 ghante',
+                      label: s.fullDay,
+                      sub: s.eightHours,
                       selected: _dayType == DayType.full,
                       onTap: () => setState(() => _dayType = DayType.full),
                     ),
@@ -211,8 +189,8 @@ class _BookingSheetState extends State<BookingSheet> {
                   Gap.hLg,
                   Expanded(
                     child: _TypeChip(
-                      label: 'Half day',
-                      sub: '4 ghante',
+                      label: s.halfDay,
+                      sub: s.fourHours,
                       selected: _dayType == DayType.half,
                       onTap: () => setState(() => _dayType = DayType.half),
                     ),
@@ -220,10 +198,10 @@ class _BookingSheetState extends State<BookingSheet> {
                 ],
               ),
               Gap.v20,
-              const KwSectionTitle('Kaam kahan hai'),
+              KwSectionTitle(s.whereIsWork),
               KwTextField(
                 controller: _address,
-                hintText: 'Address daalein',
+                hintText: s.addressHint,
                 errorText: _addressError,
                 onChanged: (_) {
                   if (_addressError != null) {
@@ -234,7 +212,7 @@ class _BookingSheetState extends State<BookingSheet> {
               Gap.vLg,
               KwTextField(
                 controller: _notes,
-                hintText: 'Kuch batana hai? (optional)',
+                hintText: s.bookingNotesHint,
               ),
               Gap.v24,
               Container(
@@ -250,11 +228,11 @@ class _BookingSheetState extends State<BookingSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Total', style: AppType.label),
+                          Text(s.total, style: AppType.label),
                           Text(
                             '${_selectedDate.day} '
-                            '${_months[_selectedDate.month - 1]} · '
-                            '${_dayType.label}',
+                            '${s.monthsShort[_selectedDate.month - 1]} · '
+                            '${_dayType.labelIn(s)}',
                             style: AppType.caption.copyWith(fontSize: 11),
                           ),
                         ],
@@ -281,7 +259,7 @@ class _BookingSheetState extends State<BookingSheet> {
               ),
               Gap.v20,
               KwButton(
-                label: 'Booking confirm karein',
+                label: s.confirmBooking,
                 icon: Icons.event_available_rounded,
                 size: KwButtonSize.large,
                 busy: _submitting,

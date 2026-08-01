@@ -186,6 +186,31 @@ class ApiRepository implements KaamWalaRepository {
       ProfileBundle.fromJson(_obj(await _api.get('thekedar/profile')));
 
   @override
+  Future<AppUser> updateProfile({
+    String? name,
+    String? email,
+    String? city,
+    String? address,
+    double? latitude,
+    double? longitude,
+  }) async {
+    // `sometimes` validation on the server: an omitted key is left alone,
+    // while an explicit null clears the column. Only send what changed.
+    final data = await _api.post(
+      'thekedar/profile',
+      body: {
+        'name': ?name,
+        'email': ?email,
+        'city': ?city,
+        'address': ?address,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+      },
+    );
+    return AppUser.fromJson(_obj(data));
+  }
+
+  @override
   Future<AccountSettings> account() async =>
       AccountSettings.fromJson(_obj(await _api.get('thekedar/account')));
 

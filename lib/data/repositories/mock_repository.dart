@@ -56,7 +56,7 @@ class MockRepository implements KaamWalaRepository {
     }
     return AuthResult(
       token: 'mock-token',
-      user: Mock.currentUser,
+      user: _user,
       isProfileComplete: true,
     );
   }
@@ -65,7 +65,7 @@ class MockRepository implements KaamWalaRepository {
   Future<void> logout() => _delayed(null);
 
   @override
-  Future<AppUser> me() => _delayed(Mock.currentUser);
+  Future<AppUser> me() => _delayed(_user);
 
   // ── Search & detail ───────────────────────────────────────────────────────
 
@@ -170,7 +170,9 @@ class MockRepository implements KaamWalaRepository {
     final booking = Booking(
       id: DateTime.now().millisecondsSinceEpoch % 100000,
       labour: labour.ref,
-      skillName: labour.primarySkill,
+      // The API echoes back the skill's own name, so the mock reads it off the
+      // record rather than through a language-dependent label.
+      skillName: labour.skills.firstOrNull?.name,
       workDate: workDate,
       startTime: startTime,
       dayType: dayType,
@@ -243,12 +245,35 @@ class MockRepository implements KaamWalaRepository {
 
   // ── Profile & account ─────────────────────────────────────────────────────
 
+  /// Mutable copy so edits made in a demo survive until the app restarts.
+  AppUser _user = Mock.currentUser;
+
+  @override
+  Future<AppUser> updateProfile({
+    String? name,
+    String? email,
+    String? city,
+    String? address,
+    double? latitude,
+    double? longitude,
+  }) {
+    _user = _user.copyWith(
+      name: name,
+      email: email,
+      city: city,
+      address: address,
+      latitude: latitude,
+      longitude: longitude,
+    );
+    return _delayed(_user);
+  }
+
   @override
   Future<ProfileBundle> profile() {
     final done = _bookings.where((b) => b.isDone);
     return _delayed(
       ProfileBundle(
-        user: Mock.currentUser,
+        user: _user,
         stats: ThekedarStats(
           totalBookings: _bookings.length,
           activeBookings: _bookings.where((b) => b.isActive).length,

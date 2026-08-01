@@ -35,6 +35,8 @@ abstract final class Mock {
     address: 'Sector 14, Gurgaon',
     latitude: 28.4595,
     longitude: 77.0266,
+    // The demo runs in the voice the screens were designed in.
+    language: 'hi-en',
     referralCode: 'AMIT250',
     isProfileComplete: true,
   );

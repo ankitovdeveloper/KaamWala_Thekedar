@@ -2,22 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/animations/pressable.dart';
+import '../../../core/i18n/app_strings.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../data/session.dart';
 
 /// Maps onto `GET /v1/thekedar/bookings?tab=all|active|pending|done`.
 enum BookingTab {
-  all('Sab', 'all'),
-  active('Active', 'active'),
-  pending('Pending', 'pending'),
-  done('Done', 'done');
+  all('all'),
+  active('active'),
+  pending('pending'),
+  done('done');
 
-  const BookingTab(this.label, this.wire);
-  final String label;
+  const BookingTab(this.wire);
   final String wire;
+
+  String labelIn(AppStrings s) => switch (this) {
+    BookingTab.all => s.tabAll,
+    BookingTab.active => s.tabActive,
+    BookingTab.pending => s.tabPending,
+    BookingTab.done => s.tabDone,
+  };
 }
 
 /// Filter tabs with a black pill that slides between options rather than
@@ -113,7 +121,7 @@ class _Tab extends StatelessWidget {
                 color: selected ? AppColors.yellow : AppColors.muted,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),
-              child: Text(tab.label),
+              child: Text(tab.labelIn(context.s)),
             ),
             if (count != null && count! > 0) ...[
               Gap.hSm,

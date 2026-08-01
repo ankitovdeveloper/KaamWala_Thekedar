@@ -54,6 +54,9 @@ class KwScaffold extends StatelessWidget {
         systemNavigationBarIconBrightness: bottomBar != null
             ? Brightness.light
             : Brightness.dark,
+        // Edge-to-edge: let the app's own colour show through instead of the
+        // translucent scrim Android otherwise forces behind the gesture bar.
+        systemNavigationBarContrastEnforced: false,
       ),
       child: Scaffold(
         backgroundColor: backgroundColor,

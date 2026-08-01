@@ -55,6 +55,10 @@ class _AccountScreenState extends State<AccountScreen> {
     final previous = _settings.value;
     if (previous == null) return;
 
+    // Captured before the first await: the session outlives this State, so
+    // reaching back through `context` after an async gap is not safe.
+    final session = context.session;
+
     // Optimistic: paint the new state, then reconcile with the server.
     _settings.setValue(
       previous.copyWith(
@@ -64,9 +68,13 @@ class _AccountScreenState extends State<AccountScreen> {
         notifySms: notifySms,
       ),
     );
+    // Language is the one preference the whole app reads, so switch it locally
+    // before the round trip — waiting on the server to redraw the UI in the
+    // new language would feel like the tap did nothing.
+    if (language != null) await session.setLanguage(language);
 
     try {
-      final saved = await context.repo.updatePreferences(
+      final saved = await session.repo.updatePreferences(
         language: language,
         notifyPush: notifyPush,
         notifyWhatsapp: notifyWhatsapp,
@@ -76,9 +84,9 @@ class _AccountScreenState extends State<AccountScreen> {
       _settings.setValue(saved);
 
       // Keep the cached user in step; the same columns live on `users`.
-      final user = context.session.user;
+      final user = session.user;
       if (user != null) {
-        context.session.updateUser(
+        session.updateUser(
           user.copyWith(
             language: saved.language,
             notifyPush: saved.notifyPush,
@@ -90,7 +98,11 @@ class _AccountScreenState extends State<AccountScreen> {
     } on Object catch (e) {
       if (!mounted) return;
       _settings.setValue(previous);
-      _toast(describeError(e));
+      // Roll the app language back too, so what is on screen matches what the
+      // server actually holds.
+      if (language != null) await session.setLanguage(previous.language);
+      if (!mounted) return;
+      _toast(describeError(context, e));
     }
   }
 
@@ -106,7 +118,7 @@ class _AccountScreenState extends State<AccountScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(Gap.x4l, 0, Gap.x4l, Gap.md),
-              child: Text('Bhasha chunein', style: AppType.h3),
+              child: Text(context.s.chooseLanguage, style: AppType.h3),
             ),
             ...Stagger.wrap(
               step: const Duration(milliseconds: 40),
@@ -141,26 +153,24 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Future<void> _logout() async {
+    final s = context.s;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Logout karein?', style: AppType.h4),
-        content: Text(
-          'Aapko dobara OTP se login karna padega.',
-          style: AppType.bodyMuted,
-        ),
+        title: Text(s.logoutTitle, style: AppType.h4),
+        content: Text(s.logoutMessage, style: AppType.bodyMuted),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(
-              'Rehne dein',
+              s.keepIt,
               style: AppType.buttonSmall.copyWith(color: AppColors.muted),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(
-              'Logout',
+              s.logout,
               style: AppType.buttonSmall.copyWith(color: AppColors.danger),
             ),
           ),
@@ -188,7 +198,7 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FadeSlideIn(
                 from: SlideFrom.left,
                 offset: 14,
-                child: Text('Account Settings', style: AppType.h2),
+                child: Text(context.s.accountSettings, style: AppType.h2),
               ),
             ),
           ),
@@ -221,6 +231,7 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _content(AccountSettings settings) {
+    final s = context.s;
     final referral = context.session.user?.referralCode;
 
     return CustomScrollView(
@@ -241,12 +252,12 @@ class _AccountScreenState extends State<AccountScreen> {
                 step: const Duration(milliseconds: 50),
                 offset: 18,
                 children: [
-                  const KwSectionTitle('Preferences'),
+                  KwSectionTitle(s.preferences),
                   KwMenuCard(
                     children: [
                       KwMenuRow(
                         icon: Icons.notifications_none_rounded,
-                        label: 'Notifications',
+                        label: s.notifications,
                         showChevron: false,
                         trailing: KwToggle(
                           value: settings.notifyPush,
@@ -255,7 +266,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       ),
                       KwMenuRow(
                         icon: Icons.chat_bubble_outline_rounded,
-                        label: 'WhatsApp Alerts',
+                        label: s.whatsappAlerts,
                         showChevron: false,
                         trailing: KwToggle(
                           value: settings.notifyWhatsapp,
@@ -264,7 +275,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       ),
                       KwMenuRow(
                         icon: Icons.sms_outlined,
-                        label: 'SMS Alerts',
+                        label: s.smsAlerts,
                         showChevron: false,
                         trailing: KwToggle(
                           value: settings.notifySms,
@@ -273,7 +284,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       ),
                       KwMenuRow(
                         icon: Icons.language_rounded,
-                        label: 'Language / Bhasha',
+                        label: s.languageRow,
                         divider: false,
                         trailing: AnimatedSwitcher(
                           duration: Motion.fast,
@@ -287,64 +298,64 @@ class _AccountScreenState extends State<AccountScreen> {
                       ),
                     ],
                   ),
-                  const KwSectionTitle('Payment'),
+                  KwSectionTitle(s.payment),
                   KwMenuCard(
                     children: [
                       KwMenuRow(
                         icon: Icons.credit_card_rounded,
-                        label: 'Payment Methods',
-                        onTap: () => _toast('Payment methods jald aayenge'),
+                        label: s.paymentMethods,
+                        onTap: () => _toast(s.paymentMethodsSoon),
                       ),
                       KwMenuRow(
                         icon: Icons.receipt_long_outlined,
-                        label: 'Payment History',
-                        onTap: () => _toast('Payment history jald aayegi'),
+                        label: s.paymentHistory,
+                        onTap: () => _toast(s.paymentHistorySoon),
                       ),
                       KwMenuRow(
                         icon: Icons.card_giftcard_rounded,
-                        label: 'Refer & Earn',
+                        label: s.referEarn,
                         divider: false,
-                        trailing: const KwBadge(label: 'New'),
+                        trailing: KwBadge(label: s.badgeNew),
                         onTap: () => _toast(
                           referral == null
-                              ? 'Referral code jald aayega'
-                              : 'Referral code: $referral',
+                              ? s.referralCodeSoon
+                              : s.referralCodeIs(referral),
                         ),
                       ),
                     ],
                   ),
-                  const KwSectionTitle('Privacy & Security'),
+                  KwSectionTitle(s.privacySecurity),
                   KwMenuCard(
                     children: [
                       KwMenuRow(
                         icon: Icons.lock_outline_rounded,
-                        label: 'Privacy Settings',
-                        onTap: () => _toast('Privacy settings jald aayengi'),
+                        label: s.privacySettings,
+                        onTap: () => _toast(s.privacySettingsSoon),
                       ),
                       KwMenuRow(
                         icon: Icons.shield_outlined,
-                        label: 'Account Security',
+                        label: s.accountSecurity,
                         divider: false,
-                        onTap: () => _toast('Account security jald aayegi'),
+                        onTap: () => _toast(s.accountSecuritySoon),
                       ),
                     ],
                   ),
-                  const KwSectionTitle('Help'),
+                  KwSectionTitle(s.help),
                   KwMenuCard(
                     children: [
                       KwMenuRow(
                         icon: Icons.help_outline_rounded,
-                        label: 'Help & Support',
-                        onTap: () => _toast('Support: 1800-123-4567'),
+                        label: s.helpSupport,
+                        onTap: () => _toast(s.supportLine),
                       ),
                       KwMenuRow(
                         icon: Icons.description_outlined,
-                        label: 'Terms & Conditions',
-                        onTap: () => _toast('Terms & Conditions'),
+                        label: s.terms,
+                        onTap: () => _toast(s.terms),
                       ),
                       KwMenuRow(
                         icon: Icons.info_outline_rounded,
-                        label: 'App Version',
+                        label: s.appVersion,
                         showChevron: false,
                         divider: false,
                         trailing: Text(
@@ -393,7 +404,7 @@ class _AccountScreenState extends State<AccountScreen> {
               Gap.hXl,
               Expanded(
                 child: Text(
-                  'Logout',
+                  context.s.logout,
                   style: AppType.bodyStrong.copyWith(color: AppColors.danger),
                 ),
               ),

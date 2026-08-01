@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/async/loadable.dart';
 import '../core/theme/app_theme.dart';
 import '../data/api/api_exception.dart';
+import '../data/session.dart';
 import 'kw_button.dart';
 import 'kw_common.dart';
 
@@ -103,19 +104,20 @@ class ApiErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     final api = error is ApiException ? error as ApiException : null;
     final offline = api?.kind == ApiErrorKind.network;
 
     return KwEmptyState(
       icon: offline ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
-      title: offline ? 'Internet nahi mil raha' : 'Kuch galat ho gaya',
-      message: api?.userMessage ?? 'Dobara try karein.',
+      title: offline ? s.errorOffline : s.errorGeneric,
+      message: api?.userMessageIn(s) ?? s.errorTryAgain,
       action: onRetry == null
           ? null
           : SizedBox(
               width: 180,
               child: KwButton(
-                label: 'Dobara try karein',
+                label: s.retry,
                 icon: Icons.refresh_rounded,
                 size: KwButtonSize.small,
                 onPressed: onRetry,
@@ -125,7 +127,9 @@ class ApiErrorState extends StatelessWidget {
   }
 }
 
-/// Turns any thrown object into a one-line message for a snackbar.
-String describeError(Object error) => error is ApiException
-    ? error.userMessage
-    : 'Kuch galat ho gaya. Dobara try karein.';
+/// Turns any thrown object into a one-line message for a snackbar, in the
+/// language the session is currently set to.
+String describeError(BuildContext context, Object error) {
+  final s = context.s;
+  return error is ApiException ? error.userMessageIn(s) : s.errorGenericFull;
+}

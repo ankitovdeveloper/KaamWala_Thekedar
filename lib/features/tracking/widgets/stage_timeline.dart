@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../data/models/models.dart';
+import '../../../data/session.dart';
 
 /// How far the job has got, as a row of connected dots.
 ///
@@ -18,21 +19,16 @@ class StageTimeline extends StatelessWidget {
   /// not something already achieved.
   final bool reached;
 
-  static const _steps = [
-    (JobStage.pending, 'Accept'),
-    (JobStage.onTheWay, 'Raaste mein'),
-    (JobStage.working, 'Kaam'),
-    (JobStage.completed, 'Poora'),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
+    final steps = [s.stepAccept, s.stepOnTheWay, s.stepWorking, s.stepDone];
     final current = reached ? JobStage.values.indexOf(stage) : -1;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < _steps.length; i++) ...[
+        for (var i = 0; i < steps.length; i++) ...[
           if (i > 0)
             Expanded(
               child: Padding(
@@ -45,7 +41,7 @@ class StageTimeline extends StatelessWidget {
                 ),
               ),
             ),
-          _Step(label: _steps[i].$2, done: i <= current, active: i == current),
+          _Step(label: steps[i], done: i <= current, active: i == current),
         ],
       ],
     );

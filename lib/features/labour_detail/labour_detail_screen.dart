@@ -107,11 +107,11 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
       _detail.setValue(labour.copyWith(isSaved: saved));
       _toast(
         saved
-            ? '${labour.name} saved list mein add hua'
-            : '${labour.name} saved list se hata diya',
+            ? context.s.savedAdded(labour.name)
+            : context.s.savedRemoved(labour.name),
       );
     } on Object catch (e) {
-      if (mounted) _toast(describeError(e));
+      if (mounted) _toast(describeError(context, e));
     } finally {
       if (mounted) setState(() => _savingFavourite = false);
     }
@@ -195,7 +195,7 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
                   _detailsCard(l),
                   Gap.vXl,
                   if (l.bio != null) ...[_aboutCard(l), Gap.vXl],
-                  Text('Recent Reviews', style: AppType.bodyStrong),
+                  Text(context.s.recentReviews, style: AppType.bodyStrong),
                   Gap.vLg,
                   ..._reviews(l),
                 ],
@@ -208,6 +208,7 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
   }
 
   Widget _hero(Labour l) {
+    final s = context.s;
     return Container(
       width: double.infinity,
       color: AppColors.yellow,
@@ -223,14 +224,14 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
                   KwIconButton(
                     icon: Icons.arrow_back_rounded,
                     iconSize: 20,
-                    tooltip: 'Wapas',
+                    tooltip: s.back,
                     onPressed: () => Navigator.of(context).maybePop(),
                   ),
                   Gap.hXl,
                 ],
                 Expanded(
                   child: Text(
-                    'Labour Detail',
+                    s.labourDetail,
                     style: AppType.h4,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -239,14 +240,14 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
                   icon: l.isSaved
                       ? Icons.favorite_rounded
                       : Icons.favorite_border_rounded,
-                  tooltip: l.isSaved ? 'Saved list se hatao' : 'Save karein',
+                  tooltip: l.isSaved ? s.removeFromSaved : s.saveToList,
                   onPressed: () => _toggleSaved(l),
                 ),
                 Gap.hMd,
                 KwIconButton(
                   icon: Icons.ios_share_rounded,
-                  tooltip: 'Share karein',
-                  onPressed: () => _toast('Share link copy ho gaya'),
+                  tooltip: s.share,
+                  onPressed: () => _toast(s.shareLinkCopied),
                 ),
               ],
             ),
@@ -285,7 +286,7 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
                   // it's the piece that gives way on a narrow screen.
                   Flexible(
                     child: Text(
-                      '(${l.ratingsCount} reviews)',
+                      s.reviewsCount(l.ratingsCount),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppType.micro.copyWith(fontSize: 12),
@@ -332,10 +333,11 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
   // ── Body cards ────────────────────────────────────────────────────────────
 
   Widget _statsRow(Labour l) {
+    final s = context.s;
     final items = <(num, String, String)>[
-      (l.experienceYears, '+', 'Saal ka anubhav'),
-      (l.totalJobs, '', 'Kaam kiye'),
-      (l.ratingsCount, '', 'Reviews mile'),
+      (l.experienceYears, '+', s.statYearsExperience),
+      (l.totalJobs, '', s.statJobsDone),
+      (l.ratingsCount, '', s.statReviewsGot),
     ];
 
     // Equal-height boxes even when one label wraps to two lines.
@@ -375,19 +377,22 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
   }
 
   Widget _detailsCard(Labour l) {
+    final s = context.s;
+    final distance = l.distanceLabelIn(s);
+
     return KwMenuCard(
       margin: EdgeInsets.zero,
       children: [
         if (l.city != null || l.address != null)
           _DetailRow(
             icon: Icons.location_on_outlined,
-            label: 'Location / Address',
+            label: s.locationAddress,
             value: l.address ?? l.city!,
-            hint: l.distanceLabel == null ? null : 'Aapse ${l.distanceLabel}',
+            hint: distance == null ? null : s.awayFromYou(distance),
           ),
         _DetailRow(
           icon: Icons.currency_rupee_rounded,
-          label: 'Aaj ki rate',
+          label: s.todayRate,
           valueWidget: Row(
             children: [
               Text(
@@ -395,14 +400,14 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
                 style: AppType.bodyStrong.copyWith(fontSize: 20),
               ),
               Gap.hLg,
-              const KwPill(label: '/ din', background: AppColors.yellow),
+              KwPill(label: s.perDay, background: AppColors.yellow),
             ],
           ),
         ),
         if (l.skills.isNotEmpty)
           _DetailRow(
             icon: Icons.handyman_outlined,
-            label: 'Skills',
+            label: s.skills,
             valueWidget: Wrap(
               spacing: Gap.sm,
               runSpacing: Gap.sm,
@@ -414,28 +419,26 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
           ),
         _DetailRow(
           icon: Icons.schedule_rounded,
-          label: 'Availability aaj',
+          label: s.availabilityToday,
           valueWidget: KwAvailability(
             available: l.isOnDuty,
-            label: l.isOnDuty
-                ? 'Available – turant bulao'
-                : 'Abhi duty pe nahi',
+            label: l.isOnDuty ? s.availableCallNow : s.notOnDuty,
             fontSize: 13,
           ),
-          hint: l.timing == null ? null : 'Timing: ${l.timing}',
+          hint: l.timing == null ? null : s.timingLine(l.timing!),
         ),
         _DetailRow(
           icon: Icons.badge_outlined,
-          label: 'Experience',
-          value: '${l.experienceYears} saal',
+          label: s.experience,
+          value: s.years(l.experienceYears),
         ),
         _DetailRow(
           icon: Icons.phone_outlined,
           // The API hides the number until a booking exists between the two.
-          label: 'Contact',
+          label: s.contact,
           value: l.contactUnlocked && l.phone != null
               ? l.phone!
-              : 'Book karne ke baad milega',
+              : s.contactAfterBooking,
           last: true,
         ),
       ],
@@ -448,7 +451,7 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Apne baare mein', style: AppType.label),
+          Text(context.s.aboutMe, style: AppType.label),
           Gap.vSm,
           Text(l.bio!, style: AppType.body.copyWith(fontSize: 13)),
         ],
@@ -475,8 +478,8 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
               Expanded(
                 child: Text(
                   _detail.isLoading
-                      ? 'Reviews load ho rahe hain...'
-                      : 'Abhi tak koi review nahi aaya',
+                      ? context.s.reviewsLoading
+                      : context.s.noReviewsYet,
                   style: AppType.caption,
                 ),
               ),
@@ -541,13 +544,17 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
           Gap.x3l,
           Gap.xxl,
           Gap.x3l,
-          Gap.xxl + MediaQuery.viewPaddingOf(context).bottom * 0.4,
+          // Pushed above the system gesture bar when this is a page of its
+          // own. Embedded in the search pane, the shell's nav bar already
+          // owns that inset, so adding it again would just leave a gap.
+          Gap.xxl +
+              (widget.embedded ? 0 : MediaQuery.viewPaddingOf(context).bottom),
         ),
         child: ContentWidth(
           child: KwButton(
             label: _booked
-                ? 'Booking bhej di'
-                : 'Book Now – ₹${l.dailyRate} / din',
+                ? context.s.bookingSent
+                : context.s.bookNow(l.dailyRate),
             icon: Icons.event_available_rounded,
             size: KwButtonSize.large,
             succeeded: _booked,

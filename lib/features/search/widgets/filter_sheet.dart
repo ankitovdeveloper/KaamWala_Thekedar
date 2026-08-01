@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../data/api/api_config.dart';
 import '../../../data/models/models.dart';
+import '../../../data/session.dart';
 import '../../../widgets/kw_button.dart';
 import '../../../widgets/kw_common.dart';
 
@@ -103,6 +104,8 @@ class _FilterSheetState extends State<FilterSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
+
     return SafeArea(
       top: false,
       child: SingleChildScrollView(
@@ -119,7 +122,7 @@ class _FilterSheetState extends State<FilterSheet> {
             children: [
               Row(
                 children: [
-                  Text('Filter karein', style: AppType.h3),
+                  Text(s.filterTitle, style: AppType.h3),
                   const Spacer(),
                   if (_draft.activeCount > 0)
                     Pressable(
@@ -128,7 +131,7 @@ class _FilterSheetState extends State<FilterSheet> {
                         _draft = LabourFilters(sort: _draft.sort);
                       }),
                       child: Text(
-                        'Reset',
+                        s.reset,
                         style: AppType.buttonSmall.copyWith(
                           color: AppColors.muted,
                           decoration: TextDecoration.underline,
@@ -138,9 +141,9 @@ class _FilterSheetState extends State<FilterSheet> {
                 ],
               ),
               Gap.v20,
-              const KwSectionTitle('Kaam ka type'),
+              KwSectionTitle(s.workType),
               if (widget.skills.isEmpty)
-                Text('Skill list load nahi hui', style: AppType.caption)
+                Text(s.skillsNotLoaded, style: AppType.caption)
               else
                 Wrap(
                   spacing: Gap.md,
@@ -165,10 +168,10 @@ class _FilterSheetState extends State<FilterSheet> {
               Gap.v24,
               Row(
                 children: [
-                  const Expanded(child: KwSectionTitle('Zyada se zyada rate')),
+                  Expanded(child: KwSectionTitle(s.maxRate)),
                   Text(
                     _draft.maxRate >= LabourFilters.rateCeiling
-                        ? 'Koi limit nahi'
+                        ? s.noLimit
                         : '₹${_draft.maxRate.round()}',
                     style: AppType.bodyStrong,
                   ),
@@ -185,7 +188,7 @@ class _FilterSheetState extends State<FilterSheet> {
               Gap.vXl,
               Row(
                 children: [
-                  const Expanded(child: KwSectionTitle('Kitni door tak')),
+                  Expanded(child: KwSectionTitle(s.howFar)),
                   Text('${_draft.radiusKm} km', style: AppType.bodyStrong),
                 ],
               ),
@@ -206,8 +209,8 @@ class _FilterSheetState extends State<FilterSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('Sirf available', style: AppType.bodyStrong),
-                        Text('Jo abhi duty pe hain', style: AppType.caption),
+                        Text(s.onlyAvailable, style: AppType.bodyStrong),
+                        Text(s.onDutyNow, style: AppType.caption),
                       ],
                     ),
                   ),
@@ -221,7 +224,7 @@ class _FilterSheetState extends State<FilterSheet> {
               ),
               Gap.v24,
               KwButton(
-                label: 'Filter lagao',
+                label: s.applyFilter,
                 icon: Icons.check_rounded,
                 onPressed: () => Navigator.of(context).pop(_draft),
               ),
@@ -357,7 +360,7 @@ class _RadiusSheetState extends State<RadiusSheet> {
           children: [
             Row(
               children: [
-                Expanded(child: Text('Kitni door tak', style: AppType.h3)),
+                Expanded(child: Text(context.s.howFar, style: AppType.h3)),
                 Text('$_km km', style: AppType.h3),
               ],
             ),
@@ -397,7 +400,7 @@ class _RadiusSheetState extends State<RadiusSheet> {
             ),
             Gap.v20,
             KwButton(
-              label: 'Is area mein dhoondein',
+              label: context.s.searchThisArea,
               onPressed: () => Navigator.of(context).pop(_km),
             ),
           ],
@@ -421,6 +424,8 @@ class SortSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
+
     return SafeArea(
       top: false,
       child: Column(
@@ -429,7 +434,7 @@ class SortSheet extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(Gap.x4l, 0, Gap.x4l, Gap.md),
-            child: Text('Sort karein', style: AppType.h3),
+            child: Text(s.sortTitle, style: AppType.h3),
           ),
           ...Stagger.wrap(
             step: const Duration(milliseconds: 40),
@@ -443,7 +448,7 @@ class SortSheet extends StatelessWidget {
                     LabourSort.priceLow => Icons.trending_down_rounded,
                     LabourSort.priceHigh => Icons.trending_up_rounded,
                   },
-                  label: option.label,
+                  label: option.labelIn(s),
                   showChevron: false,
                   divider: option != LabourSort.values.last,
                   trailing: option == current

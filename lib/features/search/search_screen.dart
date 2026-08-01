@@ -19,6 +19,7 @@ import '../../widgets/kw_common.dart';
 import '../../widgets/kw_field.dart';
 import '../../widgets/kw_scaffold.dart';
 import '../labour_detail/labour_detail_screen.dart';
+import '../location/location_picker_screen.dart';
 import 'widgets/filter_sheet.dart';
 import 'widgets/labour_card.dart';
 import 'widgets/search_map.dart';
@@ -64,14 +65,23 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  /// Search origin. Falls back to the configured city centre until a location
-  /// plugin is wired in; the user's saved coordinates win when present.
+  /// Search origin: whatever the user set in the location picker, falling back
+  /// to the configured city centre for an account that has never set one.
   GeoPoint get _origin {
     final user = context.session.user;
     return GeoPoint(
       user?.latitude ?? ApiConfig.fallbackLat,
       user?.longitude ?? ApiConfig.fallbackLng,
     );
+  }
+
+  /// Opens the manual location picker; a save moves the origin, so the results
+  /// have to be fetched again from the new point.
+  Future<void> _changeLocation() async {
+    final saved = await LocationPickerScreen.push(context);
+    if (saved != true || !mounted) return;
+    setState(() {});
+    _results.refetchWith(_fetch);
   }
 
   Future<List<Labour>> _fetch() async {
@@ -186,8 +196,9 @@ class _SearchScreenState extends State<SearchScreen> {
   // ── Header ────────────────────────────────────────────────────────────────
 
   Widget _topBar() {
+    final s = context.s;
     final user = context.session.user;
-    final location = user?.address ?? user?.city ?? 'Location set karein';
+    final location = user?.address ?? user?.city ?? s.setLocation;
 
     return KwHeader(
       child: SafeArea(
@@ -203,14 +214,14 @@ class _SearchScreenState extends State<SearchScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Aapka location',
+                      s.yourLocation,
                       style: AppType.micro.copyWith(
                         color: AppColors.black.withValues(alpha: 0.5),
                       ),
                     ),
                     Pressable(
                       scale: 0.97,
-                      onTap: () => _toast('Location badalna jald aayega'),
+                      onTap: _changeLocation,
                       child: Row(
                         children: [
                           const Icon(
@@ -255,8 +266,8 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _notificationBell() {
     return Pressable(
       scale: 0.88,
-      onTap: () => _toast('Abhi koi naya notification nahi'),
-      semanticLabel: 'Notifications',
+      onTap: () => _toast(context.s.noNotifications),
+      semanticLabel: context.s.notifications,
       child: Container(
         width: 36,
         height: 36,
@@ -320,7 +331,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     from: SlideFrom.top,
                     child: KwSearchBar(
                       controller: _query,
-                      hintText: 'Electrician, Plumber dhundein...',
+                      hintText: context.s.searchHint,
                       onChanged: _onQueryChanged,
                       trailing: _filterButton(),
                     ),
@@ -341,7 +352,7 @@ class _SearchScreenState extends State<SearchScreen> {
     return Pressable(
       scale: 0.93,
       onTap: _openRadius,
-      semanticLabel: 'Search radius badlein',
+      semanticLabel: context.s.changeRadius,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: Gap.xl, vertical: 6),
         decoration: BoxDecoration(
@@ -392,7 +403,10 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             const Icon(Icons.tune_rounded, size: 13, color: AppColors.black),
             Gap.hXs,
-            Text('Filter', style: AppType.buttonSmall.copyWith(fontSize: 12)),
+            Text(
+              context.s.filter,
+              style: AppType.buttonSmall.copyWith(fontSize: 12),
+            ),
             AnimatedSize(
               duration: Motion.fast,
               curve: Motion.enter,
@@ -470,8 +484,8 @@ class _SearchScreenState extends State<SearchScreen> {
               hasScrollBody: false,
               child: KwEmptyState(
                 icon: Icons.person_search_rounded,
-                title: 'Koi kaam wala nahi mila',
-                message: 'Filter thoda kam karein ya doosra skill try karein.',
+                title: context.s.noLabourTitle,
+                message: context.s.noLabourMessage,
                 action: _filters.isDefault
                     ? null
                     : TextButton(
@@ -482,7 +496,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           _results.refetchWith(_fetch);
                         },
                         child: Text(
-                          'Filter hatao',
+                          context.s.clearFilters,
                           style: AppType.buttonSmall.copyWith(
                             decoration: TextDecoration.underline,
                           ),
@@ -522,6 +536,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _listHeader(int count) {
+    final s = context.s;
     return Row(
       children: [
         Expanded(
@@ -530,10 +545,10 @@ class _SearchScreenState extends State<SearchScreen> {
             child: Text(
               key: ValueKey('$count-${_results.isLoading}'),
               _results.isInitialLoad
-                  ? 'Dhoond rahe hain...'
+                  ? s.searching
                   : count == 0
-                  ? 'Koi nahi mila'
-                  : '$count kaam wale milein paas mein',
+                  ? s.noneFound
+                  : s.labourFound(count),
               style: AppType.caption.copyWith(fontSize: 13),
             ),
           ),
@@ -555,7 +570,7 @@ class _SearchScreenState extends State<SearchScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _filters.sort.label,
+                  _filters.sort.labelIn(s),
                   style: AppType.micro.copyWith(
                     fontSize: 12,
                     color: AppColors.black,
@@ -594,11 +609,11 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
       child: selected == null
-          ? const KwEmptyState(
-              key: ValueKey('empty-pane'),
+          ? KwEmptyState(
+              key: const ValueKey('empty-pane'),
               icon: Icons.touch_app_rounded,
-              title: 'Kisi kaam wale ko chunein',
-              message: 'List ya map se select karein, detail yahan khulegi.',
+              title: context.s.pickLabourTitle,
+              message: context.s.pickLabourMessage,
             )
           : LabourDetailScreen(
               key: ValueKey('pane-${selected.id}'),

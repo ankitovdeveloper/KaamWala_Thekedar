@@ -6,6 +6,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../data/api/api_config.dart';
 import '../data/models/models.dart';
+import '../data/session.dart';
 
 /// Google Maps, with a graceful path for every state that isn't "a map".
 ///
@@ -123,7 +124,7 @@ class _LoadFailed extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              'Map load nahi hua',
+              context.s.mapNotLoaded,
               style: AppType.nano.copyWith(
                 fontSize: 10,
                 color: AppColors.yellow,

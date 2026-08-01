@@ -87,6 +87,18 @@ abstract interface class KaamWalaRepository {
   /// `GET /thekedar/profile` — user, stats and addresses in one call.
   Future<ProfileBundle> profile();
 
+  /// `POST /thekedar/profile` — every field is optional server-side, so this
+  /// backs both the edit-profile form and the location picker, which sends
+  /// only an address and a coordinate pair.
+  Future<AppUser> updateProfile({
+    String? name,
+    String? email,
+    String? city,
+    String? address,
+    double? latitude,
+    double? longitude,
+  });
+
   /// `GET /thekedar/account`
   Future<AccountSettings> account();
 

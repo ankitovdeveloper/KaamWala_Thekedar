@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_colors.dart';
@@ -64,7 +65,20 @@ class HomeShellState extends State<HomeShell> {
     return Column(
       children: [
         Expanded(child: ClipRect(child: content)),
-        KwBottomNav(currentIndex: _index, onSelected: goToTab),
+        // Flutter reads the overlay style from whatever is annotated at the
+        // bottom edge of the screen. The page's own KwScaffold only covers the
+        // area above this bar, so the nav bar has to declare its own style —
+        // without it Android paints a light system bar (and a contrast scrim)
+        // over the black strip.
+        AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            systemNavigationBarColor: Colors.transparent,
+            systemNavigationBarDividerColor: Colors.transparent,
+            systemNavigationBarIconBrightness: Brightness.light,
+            systemNavigationBarContrastEnforced: false,
+          ),
+          child: KwBottomNav(currentIndex: _index, onSelected: goToTab),
+        ),
       ],
     );
   }

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../data/models/models.dart';
+import '../../../data/session.dart';
 import '../../../widgets/kw_button.dart';
 import '../../../widgets/kw_common.dart';
 
@@ -44,13 +45,13 @@ class LabourCard extends StatelessWidget {
             children: [
               _avatar(),
               Gap.hXl,
-              Expanded(child: _info()),
+              Expanded(child: _info(context)),
               if (!stacked) ...[
                 Gap.hLg,
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
                   child: KwChipButton(
-                    label: 'Connect',
+                    label: context.s.connect,
                     filled: true,
                     onPressed: onConnect,
                   ),
@@ -68,7 +69,7 @@ class LabourCard extends StatelessWidget {
               head,
               Gap.vXl,
               KwButton(
-                label: 'Connect',
+                label: context.s.connect,
                 size: KwButtonSize.small,
                 onPressed: onConnect,
               ),
@@ -94,7 +95,7 @@ class LabourCard extends StatelessWidget {
     );
   }
 
-  Widget _info() {
+  Widget _info(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -139,7 +140,7 @@ class LabourCard extends StatelessWidget {
           runSpacing: 2,
           children: [
             Text('₹${labour.dailyRate}', style: AppType.price),
-            Text('/ din aaj', style: AppType.micro),
+            Text(context.s.perDayToday, style: AppType.micro),
             if (labour.isOnDuty) const KwAvailability(available: true),
           ],
         ),

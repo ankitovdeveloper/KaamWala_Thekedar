@@ -118,13 +118,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
             onPressed: () => Navigator.of(context).maybePop(),
             icon: const Icon(Icons.arrow_back_rounded, size: 22),
             color: AppColors.black,
-            tooltip: 'Wapas',
+            tooltip: context.s.back,
           ),
           Expanded(
             child: FadeSlideIn(
               from: SlideFrom.left,
               offset: 12,
-              child: Text('Live tracking', style: AppType.h2),
+              child: Text(context.s.liveTracking, style: AppType.h2),
             ),
           ),
         ],
@@ -133,7 +133,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
   );
 
   Widget _statusCard(TrackingUpdate update) {
+    final s = context.s;
     final booking = widget.booking;
+    final eta = update.etaLabelIn(s);
 
     return SafeArea(
       top: false,
@@ -164,11 +166,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   AnimatedSwitcher(
                     duration: Motion.fast,
                     child: Column(
-                      key: ValueKey(update.etaLabel),
+                      key: ValueKey(eta),
                       crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(update.etaLabel, style: AppType.bodyStrong),
+                        Text(eta, style: AppType.bodyStrong),
                         if (update.distanceKm case final km?
                             when update.stage == JobStage.onTheWay)
                           Text(
@@ -189,7 +191,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 // A failed poll keeps the last position on screen; saying so is
                 // better than letting a frozen marker look like a stopped van.
                 Text(
-                  'Location update nahi ho pa raha — dobara koshish jaari hai',
+                  s.trackingStalled,
                   style: AppType.caption.copyWith(
                     fontSize: 12,
                     color: AppColors.danger,
@@ -229,13 +231,13 @@ class _AwaitingAccept extends StatelessWidget {
             ),
             Gap.v20,
             Text(
-              'Request bhej di gayi',
+              context.s.requestSent,
               style: AppType.h3,
               textAlign: TextAlign.center,
             ),
             Gap.vXs,
             Text(
-              '$name ke accept karte hi live location yahan dikhne lagegi.',
+              context.s.awaitingAccept(name),
               style: AppType.bodyMuted,
               textAlign: TextAlign.center,
             ),

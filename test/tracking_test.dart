@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:kaamwala_thekedar/core/i18n/app_strings.dart';
 import 'package:kaamwala_thekedar/core/tracking/tracking_session.dart';
 import 'package:kaamwala_thekedar/data/mock_data.dart';
 import 'package:kaamwala_thekedar/data/models/models.dart';
@@ -88,7 +89,7 @@ void main() {
       expect(update.accepted, isTrue);
       expect(update.position, const GeoPoint(28.47, 77.03));
       expect(update.destination, const GeoPoint(28.4595, 77.0266));
-      expect(update.etaLabel, '7 min door');
+      expect(update.etaLabelIn(AppStrings.hinglish), '7 min door');
     });
 
     test('a pending booking has no position to plot', () {
@@ -100,7 +101,7 @@ void main() {
 
       expect(update.accepted, isFalse);
       expect(update.position, isNull);
-      expect(update.etaLabel, 'Accept ka intezaar');
+      expect(update.etaLabelIn(AppStrings.hinglish), 'Accept ka intezaar');
     });
   });
 

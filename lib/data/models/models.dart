@@ -2,11 +2,16 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
+import '../../core/i18n/app_strings.dart';
 import '../api/api_client.dart';
 
-/// Wire models for the Laravel API in `RoziRoti` (`routes/api.php`, prefix
+/// Wire models for the Laravel API in `kaamwala_api` (`routes/api.php`, prefix
 /// `v1`). Field names mirror the PHP models so a payload maps across without
 /// a translation table.
+///
+/// Anything the user reads is produced by a `…In(AppStrings)` method rather
+/// than a plain getter: these labels change with the chosen language, and the
+/// data layer has no `BuildContext` to look one up from.
 
 enum UserRole { labour, thekedar, superadmin }
 
@@ -41,11 +46,11 @@ enum JobStage {
     _ => JobStage.pending,
   };
 
-  String get label => switch (this) {
-    JobStage.pending => 'Pending',
-    JobStage.onTheWay => 'Raaste mein',
-    JobStage.working => 'Kaam chal raha',
-    JobStage.completed => 'Poora hua',
+  String labelIn(AppStrings s) => switch (this) {
+    JobStage.pending => s.stagePending,
+    JobStage.onTheWay => s.stageOnTheWay,
+    JobStage.working => s.stageWorking,
+    JobStage.completed => s.stageCompleted,
   };
 }
 
@@ -56,20 +61,26 @@ enum DayType {
 
   static DayType parse(String? v) => v == 'half' ? DayType.half : DayType.full;
 
-  String get label =>
-      this == DayType.full ? 'Full day booking' : 'Half day booking';
+  String labelIn(AppStrings s) =>
+      this == DayType.full ? s.fullDayBooking : s.halfDayBooking;
 }
 
 /// Sort values accepted by `GET /thekedar/labour?sort=`.
 enum LabourSort {
-  distance('Sabse paas', 'distance'),
-  rating('Rating zyada', 'rating'),
-  priceLow('Rate kam', 'price_low'),
-  priceHigh('Rate zyada', 'price_high');
+  distance('distance'),
+  rating('rating'),
+  priceLow('price_low'),
+  priceHigh('price_high');
 
-  const LabourSort(this.label, this.wire);
-  final String label;
+  const LabourSort(this.wire);
   final String wire;
+
+  String labelIn(AppStrings s) => switch (this) {
+    LabourSort.distance => s.sortDistance,
+    LabourSort.rating => s.sortRating,
+    LabourSort.priceLow => s.sortPriceLow,
+    LabourSort.priceHigh => s.sortPriceHigh,
+  };
 }
 
 /// Languages offered in Account Settings. `wire` is what `preferences.language`
@@ -303,6 +314,8 @@ class AppUser {
     String? email,
     String? city,
     String? address,
+    double? latitude,
+    double? longitude,
     String? language,
     bool? notifyPush,
     bool? notifyWhatsapp,
@@ -316,8 +329,8 @@ class AppUser {
     email: email ?? this.email,
     city: city ?? this.city,
     address: address ?? this.address,
-    latitude: latitude,
-    longitude: longitude,
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
     language: language ?? this.language,
     notifyPush: notifyPush ?? this.notifyPush,
     notifyWhatsapp: notifyWhatsapp ?? this.notifyWhatsapp,
@@ -437,13 +450,14 @@ class Labour {
   /// Null for a worker the API has no coordinates for — the map skips them.
   GeoPoint? get latLng => GeoPoint.tryFrom(latitude, longitude);
 
-  String get primarySkill => skills.isEmpty ? 'Kaam wala' : skills.first.name;
+  String primarySkillIn(AppStrings s) =>
+      skills.isEmpty ? s.labourGeneric : skills.first.name;
 
-  String? get distanceLabel => distanceKm == null
+  String? distanceLabelIn(AppStrings s) => distanceKm == null
       ? null
       : distanceKm! < 1
-      ? '${(distanceKm! * 1000).round()} m door'
-      : '${distanceKm!.toStringAsFixed(1)} km door';
+      ? s.metresAway((distanceKm! * 1000).round())
+      : s.kmAway(distanceKm!.toStringAsFixed(1));
 
   Labour copyWith({bool? isSaved}) => Labour(
     id: id,
@@ -580,28 +594,13 @@ class Booking {
       status == BookingStatus.cancelled || status == BookingStatus.declined;
 
   /// "19 June 2026 · 10:00 AM" — time is dropped once the job is history.
-  String get whenLabel {
+  String whenLabelIn(AppStrings s) {
     if (workDate == null) return startTime ?? '';
     final d = workDate!;
-    final base = '${d.day} ${_months[d.month - 1]} ${d.year}';
+    final base = '${d.day} ${s.monthsLong[d.month - 1]} ${d.year}';
     if (isDone || startTime == null) return base;
     return '$base · ${_amPm(startTime!)}';
   }
-
-  static const _months = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
 
   static String _amPm(String hhmm) {
     final parts = hhmm.split(':');
@@ -682,13 +681,13 @@ class TrackingUpdate {
   );
 
   /// "8 min door" / "Kaam shuru ho gaya" — the tracking card's headline.
-  String get etaLabel {
-    if (!accepted) return 'Accept ka intezaar';
-    if (stage == JobStage.working) return 'Kaam shuru ho gaya';
-    if (stage == JobStage.completed) return 'Kaam poora hua';
+  String etaLabelIn(AppStrings s) {
+    if (!accepted) return s.waitingForAccept;
+    if (stage == JobStage.working) return s.workStarted;
+    if (stage == JobStage.completed) return s.workFinished;
     final eta = etaMinutes;
-    if (eta == null) return 'Raaste mein';
-    return eta <= 1 ? 'Bas pahunchne wala hai' : '$eta min door';
+    if (eta == null) return s.onTheWay;
+    return eta <= 1 ? s.almostThere : s.minutesAway(eta);
   }
 }
 

@@ -1,4 +1,4 @@
-/// Backend wiring for the Laravel API in `D:\WampServer\www\RoziRoti`
+/// Backend wiring for the Laravel API in `C:\wamp64\www\kaamwala_api`
 /// (`routes/api.php`, prefix `v1`).
 ///
 /// Override at build time without touching source:
@@ -10,8 +10,8 @@
 abstract final class ApiConfig {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
-    // defaultValue: 'http://127.0.0.1:8000/api/v1',
+    // defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
+    defaultValue: 'http://127.0.0.1:8000/api/v1',
   );
 
   /// Forces the mock repository even when a base URL is present — handy for
@@ -25,8 +25,9 @@ abstract final class ApiConfig {
   /// surface behind the same `/v1/auth` endpoints.
   static const role = 'thekedar';
 
-  /// Search needs coordinates. Until a location plugin is wired in, this is the
-  /// origin used for `GET /thekedar/labour?lat=&lng=`.
+  /// Search needs coordinates. Used for `GET /thekedar/labour?lat=&lng=` only
+  /// until the user picks their own point in the location screen, which stores
+  /// it on `users.latitude/longitude`.
   static const fallbackLat = 28.4595; // Gurgaon
   static const fallbackLng = 77.0266;
   static const defaultRadiusKm = 25;

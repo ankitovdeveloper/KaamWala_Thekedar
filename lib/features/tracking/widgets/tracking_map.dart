@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../data/api/api_config.dart';
 import '../../../data/models/models.dart';
+import '../../../data/session.dart';
 import '../../../widgets/kw_map.dart';
 
 /// Interpolates between two fixes so a polled position can be animated.
@@ -116,24 +117,29 @@ class _MapAtState extends State<_MapAt> {
     );
   }
 
-  Set<Marker> get _markers => {
-    Marker(
-      markerId: const MarkerId('worker'),
-      position: widget.position.toLatLng(),
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-      infoWindow: const InfoWindow(title: 'Kaam wala'),
-      flat: true,
-      anchor: const Offset(0.5, 0.5),
-      zIndexInt: 2,
-    ),
-    if (widget.destination case final destination?)
+  Set<Marker> get _markers {
+    final s = context.s;
+    return {
       Marker(
-        markerId: const MarkerId('site'),
-        position: destination.toLatLng(),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        infoWindow: const InfoWindow(title: 'Kaam ki jagah'),
+        markerId: const MarkerId('worker'),
+        position: widget.position.toLatLng(),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+        infoWindow: InfoWindow(title: s.workerMarker),
+        flat: true,
+        anchor: const Offset(0.5, 0.5),
+        zIndexInt: 2,
       ),
-  };
+      if (widget.destination case final destination?)
+        Marker(
+          markerId: const MarkerId('site'),
+          position: destination.toLatLng(),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
+          infoWindow: InfoWindow(title: s.siteMarker),
+        ),
+    };
+  }
 
   /// A straight line, not a routed path: turn-by-turn geometry would need the
   /// Directions API, and the remaining-distance cue reads fine without it.
@@ -192,10 +198,10 @@ class _TrackingFallback extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          Text(stage.label, style: AppType.bodyStrong),
+          Text(stage.labelIn(context.s), style: AppType.bodyStrong),
           const SizedBox(height: 2),
           Text(
-            'Map ke liye Google Maps key chahiye',
+            context.s.mapsKeyMissing,
             style: AppType.caption.copyWith(fontSize: 12),
           ),
         ],

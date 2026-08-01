@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../data/models/models.dart';
+import '../../../data/session.dart';
 import '../../../widgets/kw_button.dart';
 import '../../../widgets/kw_common.dart';
 import '../../../widgets/kw_field.dart';
@@ -45,14 +46,6 @@ class _ReviewSheetState extends State<ReviewSheet> {
   final _comment = TextEditingController();
   int _rating = 5;
 
-  static const _labels = [
-    'Bilkul theek nahi',
-    'Theek nahi tha',
-    'Chalega',
-    'Achha kaam',
-    'Bahut badhiya!',
-  ];
-
   @override
   void dispose() {
     _comment.dispose();
@@ -61,6 +54,8 @@ class _ReviewSheetState extends State<ReviewSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
+
     return SafeArea(
       top: false,
       child: SingleChildScrollView(
@@ -91,7 +86,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          widget.booking.skillName ?? 'Kaam',
+                          widget.booking.skillName ?? s.workGeneric,
                           style: AppType.caption,
                         ),
                       ],
@@ -101,7 +96,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
               ),
               Gap.v24,
               Text(
-                'Kaam kaisa laga?',
+                s.howWasWork,
                 style: AppType.h3,
                 textAlign: TextAlign.center,
               ),
@@ -140,7 +135,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
               AnimatedSwitcher(
                 duration: Motion.fast,
                 child: Text(
-                  _labels[_rating - 1],
+                  s.ratingLabels[_rating - 1],
                   key: ValueKey(_rating),
                   textAlign: TextAlign.center,
                   style: AppType.bodyStrong.copyWith(color: AppColors.muted),
@@ -149,12 +144,12 @@ class _ReviewSheetState extends State<ReviewSheet> {
               Gap.v24,
               KwTextField(
                 controller: _comment,
-                hintText: 'Kuch likhna hai? (optional)',
+                hintText: s.reviewCommentHint,
                 inputFormatters: [LengthLimitingTextInputFormatter(500)],
               ),
               Gap.v24,
               KwButton(
-                label: 'Review bhejein',
+                label: s.sendReview,
                 icon: Icons.send_rounded,
                 onPressed: () => Navigator.of(context).pop(
                   ReviewDraft(

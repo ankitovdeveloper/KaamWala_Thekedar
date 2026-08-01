@@ -77,27 +77,27 @@ class _BookingsScreenState extends State<BookingsScreen> {
   }
 
   Future<void> _cancel(Booking booking) async {
+    final s = context.s;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Booking cancel karein?', style: AppType.h4),
+        title: Text(s.cancelBookingTitle, style: AppType.h4),
         content: Text(
-          '${booking.labour.name} ki booking cancel ho jaayegi. '
-          'Baar baar cancel karne se rating gir sakti hai.',
+          s.cancelBookingMessage(booking.labour.name),
           style: AppType.bodyMuted,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(
-              'Rehne dein',
+              s.keepIt,
               style: AppType.buttonSmall.copyWith(color: AppColors.muted),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(
-              'Haan, cancel karein',
+              s.yesCancel,
               style: AppType.buttonSmall.copyWith(color: AppColors.danger),
             ),
           ),
@@ -115,10 +115,10 @@ class _BookingsScreenState extends State<BookingsScreen> {
         for (final b in _rows)
           if (b.id == booking.id) updated else b,
       ]);
-      _toast('Booking cancel ho gayi');
+      _toast(s.bookingCancelled);
       _bookings.load(silent: true);
     } on Object catch (e) {
-      if (mounted) _toast(describeError(e));
+      if (mounted) _toast(describeError(context, e));
     }
   }
 
@@ -137,9 +137,9 @@ class _BookingsScreenState extends State<BookingsScreen> {
         for (final b in _rows)
           if (b.id == booking.id) b.copyWith(hasReview: true) else b,
       ]);
-      _toast('${booking.labour.name} ko review de diya');
+      _toast(context.s.reviewSubmitted(booking.labour.name));
     } on Object catch (e) {
-      if (mounted) _toast(describeError(e));
+      if (mounted) _toast(describeError(context, e));
     }
   }
 
@@ -214,6 +214,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
   }
 
   Widget _header(List<Booking> rows) {
+    final s = context.s;
     final active = rows.where((b) => b.status == BookingStatus.accepted).length;
     final done = rows.where((b) => b.isDone).length;
 
@@ -227,7 +228,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
             FadeSlideIn(
               from: SlideFrom.left,
               offset: 14,
-              child: Text('Meri Bookings', style: AppType.h2),
+              child: Text(s.myBookings, style: AppType.h2),
             ),
             const SizedBox(height: 2),
             FadeSlideIn(
@@ -236,8 +237,8 @@ class _BookingsScreenState extends State<BookingsScreen> {
               offset: 14,
               child: Text(
                 _tab == BookingTab.all
-                    ? '$active active · $done completed'
-                    : '${rows.length} ${_tab.label.toLowerCase()}',
+                    ? s.bookingsSummary(active, done)
+                    : '${rows.length} ${_tab.labelIn(s).toLowerCase()}',
                 style: AppType.micro.copyWith(
                   fontSize: 12,
                   color: AppColors.black.withValues(alpha: 0.5),
@@ -293,29 +294,18 @@ class _BookingsScreenState extends State<BookingsScreen> {
     final phone = booking.labourPhone;
     _toast(
       phone == null
-          ? '${booking.labour.name} ka number booking accept hone par milega'
+          ? context.s.numberAfterAccept(booking.labour.name)
           : '${booking.labour.name}: $phone',
     );
   }
 
   Widget _empty() {
+    final s = context.s;
     final (title, message) = switch (_tab) {
-      BookingTab.all => (
-        'Abhi koi booking nahi',
-        'Search se kaam wala chunein aur pehli booking karein.',
-      ),
-      BookingTab.active => (
-        'Koi active booking nahi',
-        'Confirmed bookings yahan dikhengi.',
-      ),
-      BookingTab.pending => (
-        'Kuch pending nahi',
-        'Jo request abhi accept nahi hui, wo yahan aayegi.',
-      ),
-      BookingTab.done => (
-        'Abhi tak kuch complete nahi hua',
-        'Poore hue kaam yahan history mein rahenge.',
-      ),
+      BookingTab.all => (s.emptyAllTitle, s.emptyAllMessage),
+      BookingTab.active => (s.emptyActiveTitle, s.emptyActiveMessage),
+      BookingTab.pending => (s.emptyPendingTitle, s.emptyPendingMessage),
+      BookingTab.done => (s.emptyDoneTitle, s.emptyDoneMessage),
     };
 
     return SingleChildScrollView(
@@ -329,7 +319,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
             ? TextButton(
                 onPressed: () => HomeShell.of(context)?.goToTab(0),
                 child: Text(
-                  'Kaam wale dhundein',
+                  s.findLabour,
                   style: AppType.buttonSmall.copyWith(
                     decoration: TextDecoration.underline,
                   ),

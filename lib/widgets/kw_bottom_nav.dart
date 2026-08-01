@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/animations/pressable.dart';
+import '../core/i18n/app_strings.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/app_typography.dart';
+import '../data/session.dart';
 
 class NavDestination {
   const NavDestination({
@@ -19,26 +21,28 @@ class NavDestination {
   final String label;
 }
 
-const kNavDestinations = <NavDestination>[
+/// Built per language rather than held as a `const` list — the labels change
+/// with the user's language setting.
+List<NavDestination> navDestinations(AppStrings s) => [
   NavDestination(
     icon: Icons.map_outlined,
     activeIcon: Icons.map_rounded,
-    label: 'Search',
+    label: s.navSearch,
   ),
   NavDestination(
     icon: Icons.calendar_today_outlined,
     activeIcon: Icons.calendar_month_rounded,
-    label: 'Bookings',
+    label: s.navBookings,
   ),
   NavDestination(
     icon: Icons.person_outline_rounded,
     activeIcon: Icons.person_rounded,
-    label: 'Profile',
+    label: s.navProfile,
   ),
   NavDestination(
     icon: Icons.settings_outlined,
     activeIcon: Icons.settings_rounded,
-    label: 'Account',
+    label: s.navAccount,
   ),
 ];
 
@@ -50,22 +54,30 @@ class KwBottomNav extends StatelessWidget {
     super.key,
     required this.currentIndex,
     required this.onSelected,
-    this.destinations = kNavDestinations,
+    this.destinations,
   });
 
   final int currentIndex;
   final ValueChanged<int> onSelected;
-  final List<NavDestination> destinations;
+
+  /// Defaults to [navDestinations] for the current language.
+  final List<NavDestination>? destinations;
 
   @override
   Widget build(BuildContext context) {
+    final destinations = this.destinations ?? navDestinations(context.s);
+
+    // The app runs edge-to-edge, so the gesture pill / 3-button bar is drawn
+    // *over* this widget. Padding by the full inset — not a fraction of it —
+    // is what keeps the labels clear of it; anything less leaves the row
+    // sitting under the system navigation.
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return Container(
       color: AppColors.black,
       padding: EdgeInsets.only(
         top: Gap.md,
-        bottom: Gap.md + (bottomInset > 0 ? bottomInset * 0.6 : 2),
+        bottom: Gap.md + (bottomInset > 0 ? bottomInset : 2),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -187,16 +199,19 @@ class KwNavRail extends StatelessWidget {
     required this.currentIndex,
     required this.onSelected,
     this.extended = false,
-    this.destinations = kNavDestinations,
+    this.destinations,
   });
 
   final int currentIndex;
   final ValueChanged<int> onSelected;
   final bool extended;
-  final List<NavDestination> destinations;
+
+  /// Defaults to [navDestinations] for the current language.
+  final List<NavDestination>? destinations;
 
   @override
   Widget build(BuildContext context) {
+    final destinations = this.destinations ?? navDestinations(context.s);
     final width = extended ? 200.0 : 82.0;
 
     return Container(
@@ -232,7 +247,7 @@ class KwNavRail extends StatelessWidget {
                     Gap.hLg,
                     Flexible(
                       child: Text(
-                        'KaamWala',
+                        context.s.appName,
                         style: AppType.h4.copyWith(color: AppColors.white),
                         overflow: TextOverflow.ellipsis,
                       ),

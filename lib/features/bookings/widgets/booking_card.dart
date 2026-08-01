@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/i18n/app_strings.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../data/models/models.dart';
+import '../../../data/session.dart';
 import '../../../widgets/kw_button.dart';
 import '../../../widgets/kw_common.dart';
 
@@ -26,17 +28,18 @@ class BookingCard extends StatelessWidget {
   final VoidCallback onReview;
   final VoidCallback onTrack;
 
-  (String, KwStatusTone) get _status => switch (booking.status) {
-    BookingStatus.accepted => ('Confirmed', KwStatusTone.confirmed),
-    BookingStatus.pending => ('Pending', KwStatusTone.pending),
-    BookingStatus.completed => ('Completed', KwStatusTone.done),
-    BookingStatus.cancelled => ('Cancelled', KwStatusTone.cancelled),
-    BookingStatus.declined => ('Declined', KwStatusTone.cancelled),
+  (String, KwStatusTone) _status(AppStrings s) => switch (booking.status) {
+    BookingStatus.accepted => (s.statusConfirmed, KwStatusTone.confirmed),
+    BookingStatus.pending => (s.statusPending, KwStatusTone.pending),
+    BookingStatus.completed => (s.statusCompleted, KwStatusTone.done),
+    BookingStatus.cancelled => (s.statusCancelled, KwStatusTone.cancelled),
+    BookingStatus.declined => (s.statusDeclined, KwStatusTone.cancelled),
   };
 
   @override
   Widget build(BuildContext context) {
-    final (statusLabel, tone) = _status;
+    final s = context.s;
+    final (statusLabel, tone) = _status(s);
     final dimmed =
         booking.isDone ||
         booking.status == BookingStatus.cancelled ||
@@ -79,7 +82,7 @@ class BookingCard extends StatelessWidget {
                           Gap.hXs,
                           Flexible(
                             child: Text(
-                              booking.skillName ?? 'Kaam',
+                              booking.skillName ?? s.workGeneric,
                               style: AppType.caption,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -105,14 +108,14 @@ class BookingCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _info(Icons.calendar_today_outlined, booking.whenLabel),
+                  _info(Icons.calendar_today_outlined, booking.whenLabelIn(s)),
                   if (booking.address != null) ...[
                     Gap.vXs,
                     _info(Icons.location_on_outlined, booking.address!),
                   ],
                   if (!booking.isDone) ...[
                     Gap.vXs,
-                    _info(Icons.schedule_rounded, booking.dayType.label),
+                    _info(Icons.schedule_rounded, booking.dayType.labelIn(s)),
                   ],
                 ],
               ),
@@ -148,7 +151,7 @@ class BookingCard extends StatelessWidget {
                   spacing: Gap.md,
                   runSpacing: Gap.md,
                   crossAxisAlignment: WrapCrossAlignment.center,
-                  children: _actions(),
+                  children: _actions(s),
                 ),
               ],
             ),
@@ -159,28 +162,28 @@ class BookingCard extends StatelessWidget {
   }
 
   /// Spacing is supplied by the enclosing Wrap, so no gaps in here.
-  List<Widget> _actions() {
+  List<Widget> _actions(AppStrings s) {
     return switch (booking.status) {
       BookingStatus.accepted => [
         // Only offered while there is something to watch — a finished job has
         // no position left to follow.
         if (booking.isTrackable)
           KwChipButton(
-            label: 'Live track',
+            label: s.liveTrack,
             icon: Icons.near_me_rounded,
             filled: true,
             onPressed: onTrack,
           ),
         KwChipButton(
-          label: 'Call',
+          label: s.call,
           icon: Icons.phone_outlined,
           onPressed: onCall,
         ),
-        KwChipButton(label: 'Details', onPressed: onDetails),
+        KwChipButton(label: s.details, onPressed: onDetails),
       ],
       BookingStatus.pending => [
-        KwChipButton(label: 'Cancel', danger: true, onPressed: onCancel),
-        KwChipButton(label: 'Details', onPressed: onDetails),
+        KwChipButton(label: s.cancel, danger: true, onPressed: onCancel),
+        KwChipButton(label: s.details, onPressed: onDetails),
       ],
       BookingStatus.completed => [
         if (booking.hasReview)
@@ -193,19 +196,19 @@ class BookingCard extends StatelessWidget {
                 color: AppColors.muted,
               ),
               Gap.hXs,
-              Text('Review diya', style: AppType.micro),
+              Text(s.reviewDone, style: AppType.micro),
             ],
           )
         else
           KwChipButton(
-            label: 'Review do',
+            label: s.giveReview,
             icon: Icons.star_outline_rounded,
             filled: true,
             onPressed: onReview,
           ),
       ],
       BookingStatus.cancelled || BookingStatus.declined => [
-        KwChipButton(label: 'Dobara book karein', onPressed: onDetails),
+        KwChipButton(label: s.bookAgain, onPressed: onDetails),
       ],
     };
   }
@@ -281,7 +284,7 @@ class _StageTracker extends StatelessWidget {
           ),
           Gap.vSm,
           Text(
-            stage.label,
+            stage.labelIn(context.s),
             style: AppType.micro.copyWith(
               color: AppColors.successDark,
               fontWeight: FontWeight.w600,

@@ -193,7 +193,7 @@ class _OtpScreenState extends State<OtpScreen> {
         _shake++;
         _errorText = e is ApiException && e.isValidation
             ? e.message
-            : describeError(e);
+            : describeError(context, e);
       });
     }
   }
@@ -218,14 +218,14 @@ class _OtpScreenState extends State<OtpScreen> {
       );
       if (!mounted) return;
       _startCountdown(challenge.resendIn);
-      _toast('Naya OTP bhej diya');
+      _toast(context.s.otpResent);
     } on Object catch (e) {
       if (!mounted) return;
       // A 429 means the cool-down hasn't elapsed; restart the timer locally.
       if (e is ApiException && e.statusCode == 429) {
         _startCountdown(widget.args.resendIn);
       }
-      _toast(describeError(e));
+      _toast(describeError(context, e));
     }
   }
 
@@ -237,6 +237,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     return KwScaffold(
       body: SafeArea(
         top: false,
@@ -258,10 +259,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     Gap.v28,
                     FadeSlideIn(
                       delay: const Duration(milliseconds: 80),
-                      child: Text(
-                        '6-digit code bheja gaya hai',
-                        style: AppType.bodyMuted,
-                      ),
+                      child: Text(s.otpSentLine, style: AppType.bodyMuted),
                     ),
                     Gap.vSm,
                     FadeSlideIn(
@@ -318,7 +316,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     FadeSlideIn(
                       delay: const Duration(milliseconds: 300),
                       child: KwButton(
-                        label: 'Verify & Login',
+                        label: s.otpVerify,
                         icon: Icons.verified_user_rounded,
                         busy: _busy,
                         succeeded: _verified,
@@ -350,10 +348,7 @@ class _OtpScreenState extends State<OtpScreen> {
                               Gap.v20,
                               FadeSlideIn(
                                 delay: const Duration(milliseconds: 260),
-                                child: Text(
-                                  'Login ho gaya!',
-                                  style: AppType.h3,
-                                ),
+                                child: Text(s.otpLoggedIn, style: AppType.h3),
                               ),
                             ],
                           )
@@ -375,13 +370,13 @@ class _OtpScreenState extends State<OtpScreen> {
           icon: Icons.arrow_back_rounded,
           background: AppColors.veil06,
           iconSize: 20,
-          tooltip: 'Wapas',
+          tooltip: context.s.back,
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         Gap.hXl,
         Expanded(
           child: Text(
-            'OTP Verify karein',
+            context.s.otpTitle,
             style: AppType.h3,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -427,6 +422,7 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Widget _resendRow() {
+    final s = context.s;
     final canResend = _secondsLeft == 0;
     final mm = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
     final ss = (_secondsLeft % 60).toString().padLeft(2, '0');
@@ -448,7 +444,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     ),
                     Gap.hXs,
                     Text(
-                      'Dobara OTP bhejein',
+                      s.otpResend,
                       style: AppType.bodyStrong.copyWith(
                         fontSize: 13,
                         decoration: TextDecoration.underline,
@@ -462,7 +458,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Resend in ',
+                    s.otpResendIn,
                     style: AppType.caption.copyWith(fontSize: 13),
                   ),
                   // Fixed-width so the row doesn't shuffle as digits change.
@@ -501,7 +497,7 @@ class _OtpScreenState extends State<OtpScreen> {
           Gap.hMd,
           Expanded(
             child: Text(
-              'OTP SMS ya WhatsApp pe aayega. Kisi ko share mat karein.',
+              context.s.otpInfo,
               style: AppType.body.copyWith(fontSize: 13, height: 1.45),
             ),
           ),

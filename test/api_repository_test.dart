@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:kaamwala_thekedar/core/i18n/app_strings.dart';
 import 'package:kaamwala_thekedar/data/api/api_client.dart';
 import 'package:kaamwala_thekedar/data/api/api_exception.dart';
 import 'package:kaamwala_thekedar/data/models/models.dart';
@@ -199,7 +200,7 @@ void main() {
       expect(l.dailyRate, 450);
       expect(l.avgRating, 4.8);
       expect(l.isOnDuty, isTrue, reason: 'MySQL tinyint 1 means true');
-      expect(l.distanceLabel, '1.2 km door');
+      expect(l.distanceLabelIn(AppStrings.hinglish), '1.2 km door');
       expect(l.skills.map((s) => s.name), ['Electrician', 'Wiring']);
       // A null icon falls back to one derived from the skill name.
       expect(l.skills.last.emoji, isNotEmpty);
@@ -307,7 +308,10 @@ void main() {
         expect(accepted.startTime, '10:00');
         expect(accepted.labour.name, 'Ramesh Kumar');
         expect(accepted.skillName, 'Electrician');
-        expect(accepted.whenLabel, contains('10:00 AM'));
+        expect(
+          accepted.whenLabelIn(AppStrings.hinglish),
+          contains('10:00 AM'),
+        );
 
         final pending = rows.last;
         expect(pending.price, 190, reason: 'falls back to offered_amount');
