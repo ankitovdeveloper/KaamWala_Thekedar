@@ -53,8 +53,9 @@ class _BookingSheetState extends State<BookingSheet> {
   void initState() {
     super.initState();
     // Prefill from the signed-in user's saved address; `address` is required
-    // by POST /v1/thekedar/bookings.
-    final user = context.session.user;
+    // by POST /v1/thekedar/bookings. `read` because subscribing from initState
+    // throws — and a one-shot prefill has nothing to subscribe for.
+    final user = SessionScope.read(context).user;
     _address.text = user?.address ?? user?.city ?? '';
   }
 

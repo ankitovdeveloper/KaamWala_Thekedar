@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- "Use my current location" on the location picker. Coarse is declared
+         alongside fine because Android 12+ lets the user grant only the
+         approximate permission, and a neighbourhood-level fix is still good
+         enough to sort labour by distance. Neither is required to run the app —
+         the screen falls back to dragging the map or typing the address. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
         android:label="kaamwala_thekedar"
         android:name="${applicationName}"

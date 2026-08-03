@@ -374,6 +374,20 @@ class AppStrings {
   String get currentPin => 'Chuna hua point';
   String get defaultBadge => 'Default';
 
+  // ── Current location (GPS) ────────────────────────────────────────────────
+
+  String get useCurrentLocation => 'Meri current location lein';
+  String get gettingLocation => 'Location le rahe hain...';
+  String get gpsLocationFound => 'Current location mil gaya';
+  String get gpsNoAddress =>
+      'Location mil gaya, par address nahi mila — khud likh dein';
+  String get gpsServiceOff => 'Phone ka location (GPS) band hai';
+  String get gpsDenied => 'Location ki permission nahi mili';
+  String get gpsDeniedForever =>
+      'Location permission band hai. Settings se allow karein.';
+  String get gpsUnavailable => 'Location nahi mil paya. Dobara try karein.';
+  String get openSettings => 'Settings kholein';
+
   // ── Account settings ──────────────────────────────────────────────────────
 
   String get accountSettings => 'Account Settings';
@@ -948,6 +962,27 @@ class _Hindi extends AppStrings {
   String get defaultBadge => 'डिफ़ॉल्ट';
 
   @override
+  String get useCurrentLocation => 'मेरी मौजूदा लोकेशन लें';
+  @override
+  String get gettingLocation => 'लोकेशन ली जा रही है...';
+  @override
+  String get gpsLocationFound => 'मौजूदा लोकेशन मिल गई';
+  @override
+  String get gpsNoAddress =>
+      'लोकेशन मिल गई, पर पता नहीं मिला — खुद लिख दें';
+  @override
+  String get gpsServiceOff => 'फ़ोन की लोकेशन (GPS) बंद है';
+  @override
+  String get gpsDenied => 'लोकेशन की परमिशन नहीं मिली';
+  @override
+  String get gpsDeniedForever =>
+      'लोकेशन परमिशन बंद है। सेटिंग से allow करें।';
+  @override
+  String get gpsUnavailable => 'लोकेशन नहीं मिल पाई। दोबारा कोशिश करें।';
+  @override
+  String get openSettings => 'सेटिंग खोलें';
+
+  @override
   String get accountSettings => 'अकाउंट सेटिंग';
   @override
   String get preferences => 'पसंद';
@@ -1518,6 +1553,27 @@ class _English extends AppStrings {
   String get defaultBadge => 'Default';
 
   @override
+  String get useCurrentLocation => 'Use my current location';
+  @override
+  String get gettingLocation => 'Getting your location...';
+  @override
+  String get gpsLocationFound => 'Current location set';
+  @override
+  String get gpsNoAddress =>
+      'Got your location, but not the address — please type it in';
+  @override
+  String get gpsServiceOff => 'Location (GPS) is turned off on this phone';
+  @override
+  String get gpsDenied => 'Location permission was not granted';
+  @override
+  String get gpsDeniedForever =>
+      'Location permission is blocked. Allow it from Settings.';
+  @override
+  String get gpsUnavailable => 'Could not get your location. Please try again.';
+  @override
+  String get openSettings => 'Open settings';
+
+  @override
   String get accountSettings => 'Account settings';
   @override
   String get preferences => 'Preferences';
@@ -1952,6 +2008,26 @@ class _Bhojpuri extends _Hindi {
   String get locationSaved => 'लोकेशन सेव हो गइल';
   @override
   String get locationNeedsAddress => 'पता भा शहर डालीं';
+
+  @override
+  String get useCurrentLocation => 'हमार अभिये के लोकेशन लीं';
+  @override
+  String get gettingLocation => 'लोकेशन लियाइल जा रहल बा...';
+  @override
+  String get gpsLocationFound => 'अभिये के लोकेशन मिल गइल';
+  @override
+  String get gpsNoAddress => 'लोकेशन मिल गइल, बाकिर पता ना मिलल — खुद लिख दीं';
+  @override
+  String get gpsServiceOff => 'फोन के लोकेशन (GPS) बंद बा';
+  @override
+  String get gpsDenied => 'लोकेशन के परमिशन ना मिलल';
+  @override
+  String get gpsDeniedForever =>
+      'लोकेशन परमिशन बंद बा। सेटिंग से allow करीं।';
+  @override
+  String get gpsUnavailable => 'लोकेशन ना मिल पाइल। फिर से कोसिस करीं।';
+  @override
+  String get openSettings => 'सेटिंग खोलीं';
 
   @override
   String get accountSettings => 'अकाउंट सेटिंग';

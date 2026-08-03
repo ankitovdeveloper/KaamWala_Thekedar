@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/animations/entrance.dart';
+import '../../core/animations/pressable.dart';
 import '../../core/async/loadable.dart';
+import '../../core/location/device_location.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -17,16 +19,17 @@ import '../../widgets/kw_field.dart';
 import '../../widgets/kw_map.dart';
 import '../../widgets/kw_scaffold.dart';
 
-/// Lets the Thekedar set their own search origin by hand.
+/// Lets the Thekedar set their own search origin.
 ///
-/// Three ways in, in the order people reach for them: tap a saved address,
-/// drag the map under the pin, or just type the address. The coordinates are
-/// what `GET /thekedar/labour?lat=&lng=` sorts by, and the text is what gets
-/// prefilled as the work address when a booking is made — so both are saved
-/// together through `POST /thekedar/profile`.
+/// Four ways in, in the order people reach for them: hand it to the phone's
+/// GPS, tap a saved address, drag the map under the pin, or just type the
+/// address. The coordinates are what `GET /thekedar/labour?lat=&lng=` sorts by,
+/// and the text is what gets prefilled as the work address when a booking is
+/// made — so both are saved together through `POST /thekedar/profile`.
 ///
-/// There is deliberately no "use my GPS" button: that needs a platform
-/// location plugin and a runtime permission the app does not ask for yet.
+/// The GPS route is a convenience, never a requirement: a denied permission, a
+/// switched-off radio or a platform with no geocoder all leave the other three
+/// routes working, which is why nothing here blocks on it.
 class LocationPickerScreen extends StatefulWidget {
   const LocationPickerScreen({super.key});
 
@@ -51,13 +54,17 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   GoogleMapController? _map;
   late GeoPoint _point;
   bool _saving = false;
+  bool _locating = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
 
-    final user = context.session.user;
+    // `read`, not `context.session` — subscribing from initState throws, and
+    // this is a one-shot prefill that must not follow later session changes
+    // anyway (the fields are the user's to edit from here on).
+    final user = SessionScope.read(context).user;
     _address.text = user?.address ?? '';
     _city.text = user?.city ?? '';
     _point = GeoPoint(
@@ -100,6 +107,79 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     }
   }
 
+  /// Hands the pin to the phone's GPS and, when the platform can resolve it,
+  /// fills the text fields from the reverse-geocoded address.
+  ///
+  /// A fix with no address still counts as a success — the coordinates are what
+  /// search runs on — so the pin moves either way and a snackbar asks for the
+  /// label instead of throwing the whole attempt away.
+  Future<void> _useCurrentLocation() async {
+    if (_locating) return;
+    setState(() {
+      _locating = true;
+      _error = null;
+    });
+
+    try {
+      final found = await DeviceLocationService.current();
+      if (!mounted) return;
+
+      // Only overwrite what the GPS actually knows: a fix that resolved the
+      // city but not the street must not blank out an address already typed.
+      if (found.address != null) _address.text = found.address!;
+      if (found.city != null) _city.text = found.city!;
+
+      setState(() {
+        _point = found.point;
+        _locating = false;
+      });
+      _map?.animateCamera(CameraUpdate.newLatLng(found.point.toLatLng()));
+
+      _toast(
+        found.hasLabel ? context.s.gpsLocationFound : context.s.gpsNoAddress,
+      );
+    } on LocationException catch (e) {
+      if (!mounted) return;
+      setState(() => _locating = false);
+      _toast(
+        _reason(e.reason),
+        // Only offer the shortcut when there is a screen that can fix it —
+        // sending someone to Settings over a plain timeout is a dead end.
+        action: switch (e.reason) {
+          LocationFailure.serviceOff || LocationFailure.deniedForever => () =>
+            DeviceLocationService.openSettingsFor(e.reason),
+          _ => null,
+        },
+      );
+    }
+  }
+
+  String _reason(LocationFailure failure) {
+    final s = context.s;
+    return switch (failure) {
+      LocationFailure.serviceOff => s.gpsServiceOff,
+      LocationFailure.denied => s.gpsDenied,
+      LocationFailure.deniedForever => s.gpsDeniedForever,
+      LocationFailure.unavailable => s.gpsUnavailable,
+    };
+  }
+
+  void _toast(String message, {VoidCallback? action}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          action: action == null
+              ? null
+              : SnackBarAction(
+                  label: context.s.openSettings,
+                  onPressed: action,
+                ),
+        ),
+      );
+  }
+
   Future<void> _save() async {
     final address = _address.text.trim();
     final city = _city.text.trim();
@@ -129,9 +209,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     } on Object catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(describeError(context, e))));
+      _toast(describeError(context, e));
     }
   }
 
@@ -189,6 +267,16 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(s.locationSubtitle, style: AppType.bodyMuted),
+                      Gap.v20,
+                      // Above the fields, because letting the phone fill them
+                      // in is the fastest route and should be seen first.
+                      KwButton(
+                        label: s.useCurrentLocation,
+                        icon: Icons.my_location_rounded,
+                        variant: KwButtonVariant.outline,
+                        busy: _locating,
+                        onPressed: _useCurrentLocation,
+                      ),
                       Gap.v20,
                       KwFieldLabel(s.addressLabel),
                       KwTextField(
@@ -261,6 +349,19 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               ),
             ),
           ),
+          // The my-location control every map app puts here. Same handler as
+          // the labelled button below the map — this one is for the people who
+          // reach for the map first.
+          Positioned(
+            right: Gap.xxl,
+            top: Gap.xxl,
+            child: _MapFab(
+              icon: Icons.my_location_rounded,
+              tooltip: s.useCurrentLocation,
+              busy: _locating,
+              onPressed: _useCurrentLocation,
+            ),
+          ),
           Positioned(
             left: Gap.xxl,
             right: Gap.xxl,
@@ -277,8 +378,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   border: Border.all(color: AppColors.border),
                   boxShadow: AppColors.floatingShadow,
                 ),
+                // Doubles as the status line while a fix is in flight — a GPS
+                // lock can take a slow ten seconds, and two bare spinners don't
+                // say what is being waited on.
                 child: Text(
-                  ApiConfig.hasMapsKey ? s.pickOnMapHint : s.typeAddress,
+                  _locating
+                      ? s.gettingLocation
+                      : ApiConfig.hasMapsKey
+                      ? s.pickOnMapHint
+                      : s.typeAddress,
                   textAlign: TextAlign.center,
                   style: AppType.micro.copyWith(fontSize: 12),
                 ),
@@ -325,6 +433,55 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       },
     );
   }
+}
+
+/// Round control floating over the map, styled like the hint pill below it so
+/// the two read as one layer sitting on the map rather than two widgets.
+class _MapFab extends StatelessWidget {
+  const _MapFab({
+    required this.icon,
+    required this.tooltip,
+    required this.busy,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: Pressable(
+      // Null while busy so a second tap cannot queue another fix.
+      onTap: busy ? null : onPressed,
+      scale: 0.88,
+      semanticLabel: tooltip,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.border),
+          boxShadow: AppColors.floatingShadow,
+        ),
+        child: Center(
+          child: busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.black,
+                  ),
+                )
+              : Icon(icon, size: 20, color: AppColors.black),
+        ),
+      ),
+    ),
+  );
 }
 
 /// Stand-in for the map when no `GOOGLE_MAPS_API_KEY` is configured. The pin
