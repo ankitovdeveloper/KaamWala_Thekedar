@@ -233,6 +233,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                // Pencil in the top-right is where people look for "edit" on a
+                // profile header, so it sits alongside share as well as on the
+                // labelled button under the phone number.
+                KwIconButton(
+                  icon: Icons.edit_outlined,
+                  tooltip: s.editProfile,
+                  onPressed: () => _editProfile(user),
+                ),
+                Gap.hLg,
                 KwIconButton(
                   icon: Icons.ios_share_rounded,
                   tooltip: s.shareProfile,
@@ -279,10 +288,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             FadeSlideIn(
               delay: const Duration(milliseconds: 180),
               offset: 10,
+              // Outline, not ghost: a 6% veil on the yellow hero is all but
+              // invisible, and the pencil icon that labels this row has to
+              // read at a glance.
               child: KwButton(
                 label: s.editProfile,
                 icon: Icons.edit_outlined,
-                variant: KwButtonVariant.ghost,
+                variant: KwButtonVariant.outline,
                 size: KwButtonSize.small,
                 expand: false,
                 onPressed: () => _editProfile(user),

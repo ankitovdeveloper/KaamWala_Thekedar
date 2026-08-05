@@ -94,14 +94,32 @@ class Session extends ChangeNotifier {
       if (token != null && token.isNotEmpty) {
         _client.setToken(token);
         if (cached != null) {
-          _user = AppUser.fromJson(jsonDecode(cached) as Map<String, dynamic>);
+          try {
+            _user = AppUser.fromJson(jsonDecode(cached) as Map<String, dynamic>);
+          } on Object {
+            // A cache written by an older build — fall through to `me()`.
+          }
         }
-        // Confirm the token is still good; a 401 clears it via onUnauthorized.
+
+        if (_user != null) {
+          // Open the app on the cached identity straight away and confirm the
+          // token in the background. Waiting on `me()` here would hold the
+          // splash for the full receive timeout on a slow or dead network, and
+          // a 401 still bounces to login through onUnauthorized.
+          _restored = true;
+          notifyListeners();
+          unawaited(_refreshUser());
+          return;
+        }
+
+        // No usable cache, so the server is the only thing that knows who this
+        // token belongs to — this one has to be awaited.
         try {
           _user = await _repository.me();
           await _persistUser(_user!);
         } on Object {
-          // Offline or server down — keep the cached user and carry on.
+          // Offline with nothing cached: start at login rather than in a shell
+          // with no user.
         }
       }
     } on Object {
@@ -110,6 +128,19 @@ class Session extends ChangeNotifier {
 
     _restored = true;
     notifyListeners();
+  }
+
+  /// Re-reads `GET /me` behind an already-open app, so a profile changed on
+  /// another device shows up without a sign-out.
+  Future<void> _refreshUser() async {
+    try {
+      final fresh = await _repository.me();
+      _user = fresh;
+      notifyListeners();
+      await _persistUser(fresh);
+    } on Object {
+      // Offline or server down — the cached user stands.
+    }
   }
 
   Future<void> signIn(AuthResult result) async {

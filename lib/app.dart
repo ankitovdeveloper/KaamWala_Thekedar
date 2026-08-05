@@ -26,7 +26,10 @@ class _KaamWalaAppState extends State<KaamWalaApp> {
   void initState() {
     super.initState();
     _session.addListener(_onSessionChanged);
-    if (widget.session == null) _session.restore();
+    // Always restore, injected session or not — the splash route waits on
+    // `isRestored`, and a mock session's restore is a no-op that just flips the
+    // flag so tests still reach the login screen.
+    _session.restore();
   }
 
   /// When the server invalidates the token mid-session, drop straight back to
@@ -58,7 +61,9 @@ class _KaamWalaAppState extends State<KaamWalaApp> {
         debugShowCheckedModeBanner: false,
         navigatorKey: _navigatorKey,
         theme: AppTheme.light,
-        initialRoute: Routes.login,
+        // The splash decides between login and home once the persisted token
+        // has been read; booting straight to login would throw that away.
+        initialRoute: Routes.splash,
         onGenerateRoute: Routes.onGenerateRoute,
         // One place to clamp OS font scaling and stop touch/mouse drag from
         // behaving differently across platforms.

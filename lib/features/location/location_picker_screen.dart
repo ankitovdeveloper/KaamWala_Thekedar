@@ -197,7 +197,12 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     });
 
     try {
+      // `name` is `required` on `POST /thekedar/profile`, not `sometimes` — an
+      // address-only save is still a full profile update as far as the server
+      // is concerned, so resend the name we already hold or it 422s with
+      // "The name field is required".
       final updated = await context.repo.updateProfile(
+        name: SessionScope.read(context).user?.name,
         address: address.isEmpty ? null : address,
         city: city.isEmpty ? null : city,
         latitude: _point.lat,

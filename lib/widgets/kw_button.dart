@@ -154,9 +154,12 @@ class KwButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: succeeded && variant == KwButtonVariant.yellow
               ? AppColors.yellowDark
-              : palette.bg.withValues(
-                  alpha: onPressed == null && !busy ? 0.55 : 1,
-                ),
+              // Fade the fill when disabled, but scale the palette's own alpha
+              // rather than setting an absolute one — `ghost` is a translucent
+              // veil, and forcing alpha to 1 would paint it solid black.
+              : onPressed == null && !busy
+              ? palette.bg.withValues(alpha: palette.bg.a * 0.55)
+              : palette.bg,
           borderRadius: Radii.rSm,
           border: palette.border == null
               ? null

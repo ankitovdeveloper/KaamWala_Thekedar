@@ -301,6 +301,9 @@ class AppUser {
     'notify_sms': notifySms,
     'referral_code': referralCode,
     'is_profile_complete': isProfileComplete,
+    // Included so the round trip through the session cache is lossless — a
+    // cold start restored from prefs must not drop the avatar.
+    'profile_photo_url': profilePhotoUrl,
   };
 
   String get fullPhone => '$countryCode $phone';
