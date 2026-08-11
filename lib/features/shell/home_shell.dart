@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/session.dart' show unawaited;
 import '../../widgets/kw_bottom_nav.dart';
 import '../../widgets/shared_axis_stack.dart';
 import '../account/account_screen.dart';
 import '../bookings/bookings_screen.dart';
+import '../location/location_prompt.dart';
 import '../profile/profile_screen.dart';
 import '../search/search_screen.dart';
 
@@ -25,8 +27,36 @@ class HomeShell extends StatefulWidget {
       context.findAncestorStateOfType<HomeShellState>();
 }
 
-class HomeShellState extends State<HomeShell> {
+class HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late int _index = widget.initialIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    // Coming back from the background counts as opening the app — someone who
+    // left the phone in a pocket on the way to a new site never restarts it.
+    WidgetsBinding.instance.addObserver(this);
+    // Post-frame: the sheet needs a Navigator, and the shell is still building.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _askForLocation());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _askForLocation();
+  }
+
+  /// Asks where the Thekedar is, unless a point saved within the last four
+  /// hours already answers that — [LocationPrompt] owns that decision.
+  void _askForLocation() {
+    if (!mounted) return;
+    unawaited(LocationPrompt.maybeShow(context));
+  }
 
   void goToTab(int index) {
     if (index == _index) return;

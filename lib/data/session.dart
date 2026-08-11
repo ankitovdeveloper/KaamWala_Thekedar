@@ -33,6 +33,14 @@ class Session extends ChangeNotifier {
   static const _tokenKey = 'kw.auth.token';
   static const _userKey = 'kw.auth.user';
   static const _languageKey = 'kw.pref.language';
+  static const _locationStampKey = 'kw.location.updated_at';
+
+  /// How long a confirmed location is trusted before the app asks again.
+  ///
+  /// A Thekedar moves between sites during the day, and search results are only
+  /// as good as the point they are measured from — but asking on every launch
+  /// would be a tax on the common case of not having moved at all.
+  static const locationMaxAge = Duration(hours: 4);
 
   final ApiClient? _client;
   late final KaamWalaRepository _repository;
@@ -63,6 +71,41 @@ class Session extends ChangeNotifier {
     await _persistLanguage(code);
   }
 
+  /// Locally recorded time of the last saved location, used when the server
+  /// doesn't send `location_updated_at` — an older deploy of
+  /// `POST /thekedar/profile` simply doesn't have the column, and without a
+  /// fallback the prompt would reappear on every single launch there.
+  DateTime? _localLocationStamp;
+
+  /// When the signed-in user last confirmed their coordinates. The server's
+  /// stamp wins, since it is shared across the user's devices.
+  DateTime? get locationUpdatedAt =>
+      _user?.locationUpdatedAt ?? _localLocationStamp;
+
+  /// Whether to ask the Thekedar where they are: no point saved yet, or the
+  /// saved one is older than [locationMaxAge].
+  ///
+  /// A future stamp (a device clock behind the server's) reads as fresh rather
+  /// than as overdue, which is the harmless direction to be wrong in.
+  bool get needsLocationUpdate {
+    final user = _user;
+    if (user == null || !isAuthenticated) return false;
+    if (GeoPoint.tryFrom(user.latitude, user.longitude) == null) return true;
+
+    final stamp = locationUpdatedAt;
+    if (stamp == null) return true;
+    return DateTime.now().difference(stamp) >= locationMaxAge;
+  }
+
+  /// Applies a profile the server just accepted a new location for, and starts
+  /// the [locationMaxAge] clock. Use this instead of [updateUser] after any
+  /// coordinate save so the prompt stays quiet for the next four hours.
+  void saveLocation(AppUser updated) {
+    _localLocationStamp = DateTime.now();
+    updateUser(updated);
+    unawaited(_persistLocationStamp(_localLocationStamp!));
+  }
+
   bool _restored = false;
 
   /// True once [restore] has run, so the app knows whether to keep the splash.
@@ -90,6 +133,9 @@ class Session extends ChangeNotifier {
       // even when there is no token to restore.
       final saved = prefs.getString(_languageKey);
       if (saved != null && saved.isNotEmpty) _localLanguage = saved;
+
+      final stamp = prefs.getString(_locationStampKey);
+      if (stamp != null) _localLocationStamp = DateTime.tryParse(stamp);
 
       if (token != null && token.isNotEmpty) {
         _client.setToken(token);
@@ -190,10 +236,14 @@ class Session extends ChangeNotifier {
   Future<void> _clear() async {
     _user = null;
     _client?.setToken(null);
+    // The next account to sign in on this device is asked for its own location
+    // rather than inheriting the previous one's four-hour grace period.
+    _localLocationStamp = null;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_tokenKey);
       await prefs.remove(_userKey);
+      await prefs.remove(_locationStampKey);
     } on Object {
       // Nothing to clean up.
     }
@@ -210,6 +260,16 @@ class Session extends ChangeNotifier {
       await prefs.setString(_languageKey, user.language);
     } on Object {
       // Caching the user is an optimisation, not a requirement.
+    }
+  }
+
+  Future<void> _persistLocationStamp(DateTime at) async {
+    if (_client == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_locationStampKey, at.toIso8601String());
+    } on Object {
+      // Worst case the prompt asks once more on the next cold start.
     }
   }
 

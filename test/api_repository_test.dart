@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -24,6 +25,15 @@ class _FakeClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     lastRequest = request;
     if (request is http.Request) lastBody = request.body;
+    // Multipart bodies are a byte stream, not a `body` string. Decoded loosely
+    // so a test can assert on the part headers without the image bytes — which
+    // are not valid UTF-8 — throwing.
+    if (request is http.MultipartRequest) {
+      lastBody = utf8.decode(
+        await request.finalize().toBytes(),
+        allowMalformed: true,
+      );
+    }
 
     final result = respond(request);
     final encoded = utf8.encode(
@@ -385,6 +395,134 @@ void main() {
       expect(bundle.addresses.single.line, 'Sector 14, Gurgaon');
       expect(bundle.addresses.single.isDefault, isTrue);
     });
+
+    test('updateProfile round-trips the address', () async {
+      // `POST /thekedar/profile` answers with the bare user, not the bundle,
+      // and `address` has to survive both legs: the location picker saves it,
+      // and every screen that edits it prefills from the reply.
+      final (:repo, :client) = _build(
+        (_) => (
+          status: 200,
+          body: _ok({
+            'id': 1,
+            'name': 'Amit Khurana',
+            'phone': '9876543210',
+            'city': 'Gurugram',
+            'address': 'Sushant Lok Phase 1, Gurugram',
+            'latitude': '28.4600000',
+            'longitude': '77.0900000',
+          }, 'Profile updated.'),
+        ),
+      );
+
+      final user = await repo.updateProfile(
+        name: 'Amit Khurana',
+        address: 'Sushant Lok Phase 1, Gurugram',
+        city: 'Gurugram',
+        latitude: 28.46,
+        longitude: 77.09,
+      );
+
+      final sent = jsonDecode(client.lastBody) as Map<String, dynamic>;
+      expect(sent['address'], 'Sushant Lok Phase 1, Gurugram');
+      expect(user.address, 'Sushant Lok Phase 1, Gurugram');
+      expect(user.latitude, 28.46);
+    });
+
+    test(
+      'updateProfile sends an emptied address instead of omitting it',
+      () async {
+        // An omitted key means "leave the column alone" server-side, so a
+        // cleared field has to travel as '' or the old address comes straight
+        // back the next time the screen is opened.
+        final (:repo, :client) = _build(
+          (_) => (
+            status: 200,
+            body: _ok({
+              'id': 1,
+              'name': 'Amit Khurana',
+              'phone': '9876543210',
+              'city': 'Gurugram',
+              'address': null,
+            }, 'Profile updated.'),
+          ),
+        );
+
+        final user = await repo.updateProfile(
+          name: 'Amit Khurana',
+          address: '',
+        );
+
+        final sent = jsonDecode(client.lastBody) as Map<String, dynamic>;
+        expect(sent.containsKey('address'), isTrue);
+        expect(sent['address'], '');
+        expect(user.address, isNull);
+      },
+    );
+
+    test(
+      'updateProfilePhoto posts multipart and reads the user back',
+      () async {
+        const url =
+            'http://localhost/RoziRoti/public/storage/profile-photos/abc.png';
+        final (:repo, :client) = _build(
+          (_) => (
+            status: 200,
+            body: _ok({
+              'id': 1,
+              'name': 'Amit Khurana',
+              'phone': '9876543210',
+              'profile_photo': 'profile-photos/abc.png',
+              'profile_photo_url': url,
+            }, 'Photo updated.'),
+          ),
+        );
+
+        final user = await repo.updateProfilePhoto(
+          bytes: Uint8List.fromList(const [0x89, 0x50, 0x4e, 0x47]),
+          filename: 'avatar.png',
+        );
+
+        final request = client.lastRequest!;
+        expect(request.method, 'POST');
+        expect(request.url.path, endsWith('/thekedar/profile/photo'));
+        expect(
+          request.headers['content-type'],
+          startsWith('multipart/form-data'),
+        );
+        // Laravel validates `photo`; a renamed field 422s with no clue why.
+        expect(client.lastBody, contains('name="photo"'));
+        expect(client.lastBody, contains('filename="avatar.png"'));
+        expect(user.profilePhotoUrl, url);
+      },
+    );
+
+    test(
+      'removeProfilePhoto deletes and reads the cleared user back',
+      () async {
+        final (:repo, :client) = _build(
+          (_) => (
+            status: 200,
+            body: _ok({
+              'id': 1,
+              'name': 'Amit Khurana',
+              'phone': '9876543210',
+              'profile_photo': null,
+              'profile_photo_url': null,
+            }, 'Photo removed.'),
+          ),
+        );
+
+        final user = await repo.removeProfilePhoto();
+
+        expect(client.lastRequest!.method, 'DELETE');
+        expect(
+          client.lastRequest!.url.path,
+          endsWith('/thekedar/profile/photo'),
+        );
+        expect(user.profilePhotoUrl, isNull);
+      },
+    );
 
     test('account reads the preferences wrapper', () async {
       final (:repo, client: _) = _build(

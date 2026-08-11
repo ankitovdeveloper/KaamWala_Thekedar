@@ -342,6 +342,16 @@ class AppStrings {
   String get addressAddSoon => 'Address add jald aayega';
   String editAddressPrompt(String label) => '$label edit karein';
 
+  // ── Profile photo ─────────────────────────────────────────────────────────
+
+  String get addPhoto => 'Photo lagayein';
+  String get changePhoto => 'Photo badlein';
+  String get photoFromGallery => 'Gallery se chunein';
+  String get photoFromCamera => 'Camera se kheenchein';
+  String get removePhoto => 'Photo hatayein';
+  String get photoUpdated => 'Photo lag gayi';
+  String get photoRemoved => 'Photo hata di';
+
   // ── Profile edit ──────────────────────────────────────────────────────────
 
   String get editProfileTitle => 'Profile edit karein';
@@ -373,6 +383,16 @@ class AppStrings {
   String get locationNeedsAddress => 'Address ya sheher daalein';
   String get currentPin => 'Chuna hua point';
   String get defaultBadge => 'Default';
+
+  // ── On-open location prompt ───────────────────────────────────────────────
+
+  String get locationAskTitle => 'Aap abhi kahan hain?';
+  String get locationAskSubtitle =>
+      'Isi jagah se aas-paas ke kaam wale dhoonde jaayenge.';
+  String get locationAskPickOnMap => 'Doosri jagah chunein';
+  String get locationAskKeep => 'Wahi jagah theek hai';
+  String get locationAskLater => 'Baad mein';
+  String get locationAskInterval => 'Hum har 4 ghante mein ek baar poochenge.';
 
   // ── Current location (GPS) ────────────────────────────────────────────────
 
@@ -911,6 +931,21 @@ class _Hindi extends AppStrings {
   String editAddressPrompt(String label) => '$label एडिट करें';
 
   @override
+  String get addPhoto => 'फ़ोटो लगाएं';
+  @override
+  String get changePhoto => 'फ़ोटो बदलें';
+  @override
+  String get photoFromGallery => 'गैलरी से चुनें';
+  @override
+  String get photoFromCamera => 'कैमरे से खींचें';
+  @override
+  String get removePhoto => 'फ़ोटो हटाएं';
+  @override
+  String get photoUpdated => 'फ़ोटो लग गई';
+  @override
+  String get photoRemoved => 'फ़ोटो हटा दी';
+
+  @override
   String get editProfileTitle => 'प्रोफ़ाइल एडिट करें';
   @override
   String get nameLabel => 'पूरा नाम';
@@ -960,6 +995,20 @@ class _Hindi extends AppStrings {
   String get currentPin => 'चुना हुआ पॉइंट';
   @override
   String get defaultBadge => 'डिफ़ॉल्ट';
+
+  @override
+  String get locationAskTitle => 'आप अभी कहाँ हैं?';
+  @override
+  String get locationAskSubtitle =>
+      'इसी जगह से आस-पास के कारीगर खोजे जाएँगे।';
+  @override
+  String get locationAskPickOnMap => 'दूसरी जगह चुनें';
+  @override
+  String get locationAskKeep => 'वही जगह ठीक है';
+  @override
+  String get locationAskLater => 'बाद में';
+  @override
+  String get locationAskInterval => 'हम हर 4 घंटे में एक बार पूछेंगे।';
 
   @override
   String get useCurrentLocation => 'मेरी मौजूदा लोकेशन लें';
@@ -1502,6 +1551,21 @@ class _English extends AppStrings {
   String editAddressPrompt(String label) => 'Edit $label';
 
   @override
+  String get addPhoto => 'Add a photo';
+  @override
+  String get changePhoto => 'Change photo';
+  @override
+  String get photoFromGallery => 'Choose from gallery';
+  @override
+  String get photoFromCamera => 'Take a photo';
+  @override
+  String get removePhoto => 'Remove photo';
+  @override
+  String get photoUpdated => 'Photo updated';
+  @override
+  String get photoRemoved => 'Photo removed';
+
+  @override
   String get editProfileTitle => 'Edit profile';
   @override
   String get nameLabel => 'Full name';
@@ -1551,6 +1615,20 @@ class _English extends AppStrings {
   String get currentPin => 'Selected point';
   @override
   String get defaultBadge => 'Default';
+
+  @override
+  String get locationAskTitle => 'Where are you right now?';
+  @override
+  String get locationAskSubtitle =>
+      'Nearby workers will be searched from this point.';
+  @override
+  String get locationAskPickOnMap => 'Choose a different place';
+  @override
+  String get locationAskKeep => 'This place is still right';
+  @override
+  String get locationAskLater => 'Later';
+  @override
+  String get locationAskInterval => "We'll ask again in 4 hours.";
 
   @override
   String get useCurrentLocation => 'Use my current location';
@@ -2008,6 +2086,19 @@ class _Bhojpuri extends _Hindi {
   String get locationSaved => 'लोकेशन सेव हो गइल';
   @override
   String get locationNeedsAddress => 'पता भा शहर डालीं';
+
+  @override
+  String get locationAskTitle => 'आप अभिये कहाँ बानी?';
+  @override
+  String get locationAskSubtitle => 'इहे जगह से लगे-बगल के कारीगर खोजल जइहें।';
+  @override
+  String get locationAskPickOnMap => 'दूसर जगह चुनीं';
+  @override
+  String get locationAskKeep => 'इहे जगह ठीक बा';
+  @override
+  String get locationAskLater => 'बाद में';
+  @override
+  String get locationAskInterval => 'हम हर 4 घंटा में एक बेर पूछब।';
 
   @override
   String get useCurrentLocation => 'हमार अभिये के लोकेशन लीं';

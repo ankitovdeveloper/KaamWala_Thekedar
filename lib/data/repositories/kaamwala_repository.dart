@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../models/models.dart';
 
 /// Everything the Thekedar app asks of a backend.
@@ -98,6 +100,18 @@ abstract interface class KaamWalaRepository {
     double? latitude,
     double? longitude,
   });
+
+  /// `POST /thekedar/profile/photo` — multipart, field `photo`.
+  ///
+  /// Both photo calls answer with the whole user, not just the new URL, so the
+  /// caller can hand the result straight to `Session.updateUser`.
+  Future<AppUser> updateProfilePhoto({
+    required Uint8List bytes,
+    required String filename,
+  });
+
+  /// `DELETE /thekedar/profile/photo` — idempotent server-side.
+  Future<AppUser> removeProfilePhoto();
 
   /// `GET /thekedar/account`
   Future<AccountSettings> account();

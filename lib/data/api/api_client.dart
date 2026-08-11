@@ -34,8 +34,14 @@ class ApiClient {
   bool get isAuthenticated => _token != null;
 
   Map<String, String> get _headers => {
-    'Accept': 'application/json',
+    ..._authHeaders,
     'Content-Type': 'application/json',
+  };
+
+  /// [_headers] without the content type: a multipart request writes its own,
+  /// boundary included, and overriding it makes the body unparseable.
+  Map<String, String> get _authHeaders => {
+    'Accept': 'application/json',
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
@@ -73,6 +79,33 @@ class ApiClient {
 
   Future<dynamic> delete(String path) =>
       _send(() => _client.delete(_uri(path), headers: _headers));
+
+  /// Uploads one file as `multipart/form-data`, for the endpoints Laravel backs
+  /// with a `file`/`image` validation rule.
+  ///
+  /// Takes bytes rather than a path because `image_picker` is the only source:
+  /// its `XFile` has no filesystem path on web, and `readAsBytes` is the one
+  /// accessor that works on every platform this app builds for.
+  ///
+  /// No content type is attached to the part. Laravel resolves the type from
+  /// the bytes themselves — `image` and `mimes` both sniff the file rather than
+  /// trust the client — so [filename]'s extension is a label, not a promise.
+  Future<dynamic> postFile(
+    String path, {
+    required String field,
+    required List<int> bytes,
+    required String filename,
+    Map<String, String> fields = const {},
+  }) => _send(() async {
+    final request = http.MultipartRequest('POST', _uri(path))
+      ..headers.addAll(_authHeaders)
+      ..fields.addAll(fields)
+      ..files.add(
+        http.MultipartFile.fromBytes(field, bytes, filename: filename),
+      );
+
+    return http.Response.fromStream(await _client.send(request));
+  });
 
   /// Runs the request, maps transport failures onto [ApiException], and
   /// returns the envelope's `data` field.

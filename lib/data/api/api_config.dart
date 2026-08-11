@@ -1,4 +1,4 @@
-/// Backend wiring for the Laravel API in `C:\wamp64\www\kaamwala_api`
+/// Backend wiring for the Laravel API in `D:\WampServer\www\RoziRoti`
 /// (`routes/api.php`, prefix `v1`).
 ///
 /// Override at build time without touching source:
@@ -7,11 +7,16 @@
 /// ```
 /// An Android emulator reaches the host machine at `10.0.2.2`, not `127.0.0.1`,
 /// which is why the default is expressed as a host that the launcher overrides.
+///
+/// The default below assumes `php artisan serve`. Served through WampServer's
+/// Apache instead, the project sits under a sub-path and the URL becomes
+/// `http://localhost/RoziRoti/public/api/v1` — or `10.0.2.2` in place of
+/// `localhost` from an emulator.
 abstract final class ApiConfig {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
-    // defaultValue: 'http://127.0.0.1:8000/api/v1',
+    // defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
+    defaultValue: 'http://127.0.0.1:8000/api/v1',
   );
 
   /// Forces the mock repository even when a base URL is present — handy for

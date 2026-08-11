@@ -197,19 +197,26 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     });
 
     try {
-      // `name` is `required` on `POST /thekedar/profile`, not `sometimes` — an
-      // address-only save is still a full profile update as far as the server
-      // is concerned, so resend the name we already hold or it 422s with
-      // "The name field is required".
+      // The name we already hold is resent even though nothing here edits it:
+      // older deploys of `POST /thekedar/profile` mark `name` `required` rather
+      // than `sometimes`, and treat an address-only save as a full profile
+      // update — without it they 422 with "The name field is required".
       final updated = await context.repo.updateProfile(
         name: SessionScope.read(context).user?.name,
-        address: address.isEmpty ? null : address,
-        city: city.isEmpty ? null : city,
+        // Both sent even when blank. The repository drops null keys, so a null
+        // here would leave the old column untouched and the field would refill
+        // with the very text that was just deleted; an empty string clears it
+        // server-side, which is what emptying the field means.
+        address: address,
+        city: city,
         latitude: _point.lat,
         longitude: _point.lng,
       );
       if (!mounted) return;
-      context.session.updateUser(updated);
+      // Not `updateUser`: saving a point here also restarts the four-hour clock
+      // behind the on-open location prompt, so someone who has just set their
+      // location by hand isn't asked for it again a screen later.
+      context.session.saveLocation(updated);
       Navigator.of(context).pop(true);
     } on Object catch (e) {
       if (!mounted) return;

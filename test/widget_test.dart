@@ -13,6 +13,7 @@ import 'package:kaamwala_thekedar/features/bookings/widgets/booking_tabs.dart';
 import 'package:kaamwala_thekedar/features/search/search_screen.dart';
 import 'package:kaamwala_thekedar/features/shell/home_shell.dart';
 import 'package:kaamwala_thekedar/widgets/kw_bottom_nav.dart';
+import 'package:kaamwala_thekedar/widgets/kw_common.dart';
 
 /// Wraps a screen in just enough app chrome to pump it in isolation, backed by
 /// the zero-latency mock repository.
@@ -195,6 +196,58 @@ void main() {
 
       expect(find.byType(KwNavRail), findsOneWidget);
       expect(find.byType(KwBottomNav), findsNothing);
+    });
+  });
+
+  group('Profile photo', () {
+    testWidgets('a photo URL renders an image over the monogram', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          const Center(
+            child: KwAvatar(
+              initials: 'AK',
+              photoUrl: 'http://localhost/storage/profile-photos/a.png',
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets('a URL that fails to load falls back to the monogram', (
+      tester,
+    ) async {
+      // The test binding answers every network image with a 400, which is
+      // exactly the case this guards: a deleted file must leave initials on
+      // screen, not an error box.
+      await tester.pumpWidget(
+        host(
+          const Center(
+            child: KwAvatar(
+              initials: 'AK',
+              photoUrl: 'http://localhost/gone.png',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('AK'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('an empty URL is treated as no photo at all', (tester) async {
+      await tester.pumpWidget(
+        host(const Center(child: KwAvatar(initials: 'AK', photoUrl: '  '))),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Image), findsNothing);
+      expect(find.text('AK'), findsOneWidget);
     });
   });
 }

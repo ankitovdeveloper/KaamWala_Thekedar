@@ -65,12 +65,16 @@ class KwCard extends StatelessWidget {
   }
 }
 
-/// Monogram avatar. Colours are derived from the name so the same worker keeps
-/// the same identity colour on every screen.
+/// Monogram avatar, or the uploaded photo when there is one.
+///
+/// Colours are derived from the name so the same worker keeps the same identity
+/// colour on every screen — and so the monogram still reads as *them* while a
+/// photo is downloading or after it fails to.
 class KwAvatar extends StatelessWidget {
   const KwAvatar({
     super.key,
     required this.initials,
+    this.photoUrl,
     this.size = 50,
     this.background,
     this.foreground,
@@ -79,6 +83,11 @@ class KwAvatar extends StatelessWidget {
   });
 
   final String initials;
+
+  /// `users.profile_photo_url` from the API. Null, or a URL that 404s, leaves
+  /// the monogram in place rather than a broken-image box.
+  final String? photoUrl;
+
   final double size;
   final Color? background;
   final Color? foreground;
@@ -87,37 +96,68 @@ class KwAvatar extends StatelessWidget {
   /// Draws a small live dot at the corner.
   final bool online;
 
+  /// An empty string means "no photo". `strOrNull` already collapses that for
+  /// API payloads, but a caller building a URL by hand can still hand over ''.
+  String? get _url {
+    final url = photoUrl?.trim();
+    return url == null || url.isEmpty ? null : url;
+  }
+
+  /// The photo, with the monogram standing in until it arrives and again if it
+  /// never does — a dead URL must not leave a hole where the face goes.
+  Widget _photo(String url, Widget monogram) => Image.network(
+    url,
+    width: size,
+    height: size,
+    fit: BoxFit.cover,
+    // Keeps the old frame while a replacement uploads instead of blinking.
+    gaplessPlayback: true,
+    // Web only, and the reason avatars work there at all: uploads are served
+    // straight off disk by the web server, outside the API's CORS handling, and
+    // decoding a cross-origin image into a canvas without an
+    // `Access-Control-Allow-Origin` header fails. An <img> element has no such
+    // rule, so this falls back to one rather than to the monogram.
+    webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
+    loadingBuilder: (context, child, progress) =>
+        progress == null ? child : monogram,
+    errorBuilder: (context, _, _) => monogram,
+  );
+
   @override
   Widget build(BuildContext context) {
     final pair = AppColors.avatarPair(initials);
     final bg = background ?? pair.$1;
     final fg = foreground ?? pair.$2;
+    final url = _url;
+
+    final monogram = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Padding(
+        padding: EdgeInsets.all(size * 0.18),
+        child: Text(
+          initials,
+          style: TextStyle(
+            fontFamily: AppType.family,
+            fontFamilyFallback: AppType.fallback,
+            fontSize: size * 0.36,
+            fontWeight: FontWeight.w700,
+            color: fg,
+          ),
+        ),
+      ),
+    );
 
     Widget circle = Container(
       width: size,
       height: size,
       alignment: Alignment.center,
+      clipBehavior: url == null ? Clip.none : Clip.antiAlias,
       decoration: BoxDecoration(
         color: bg,
         shape: BoxShape.circle,
         border: ring == null ? null : Border.all(color: ring!, width: 4),
       ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Padding(
-          padding: EdgeInsets.all(size * 0.18),
-          child: Text(
-            initials,
-            style: TextStyle(
-              fontFamily: AppType.family,
-              fontFamilyFallback: AppType.fallback,
-              fontSize: size * 0.36,
-              fontWeight: FontWeight.w700,
-              color: fg,
-            ),
-          ),
-        ),
-      ),
+      child: url == null ? monogram : _photo(url, monogram),
     );
 
     if (!online) return circle;

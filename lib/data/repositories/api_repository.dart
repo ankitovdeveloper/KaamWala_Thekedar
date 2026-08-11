@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../api/api_client.dart';
 import '../api/api_config.dart';
 import '../models/models.dart';
@@ -209,6 +211,25 @@ class ApiRepository implements KaamWalaRepository {
     );
     return AppUser.fromJson(_obj(data));
   }
+
+  @override
+  Future<AppUser> updateProfilePhoto({
+    required Uint8List bytes,
+    required String filename,
+  }) async {
+    final data = await _api.postFile(
+      'thekedar/profile/photo',
+      field: 'photo',
+      bytes: bytes,
+      filename: filename,
+    );
+    return AppUser.fromJson(_obj(data));
+  }
+
+  @override
+  Future<AppUser> removeProfilePhoto() async => AppUser.fromJson(
+    _obj(await _api.delete('thekedar/profile/photo')),
+  );
 
   @override
   Future<AccountSettings> account() async =>

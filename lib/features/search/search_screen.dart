@@ -46,6 +46,13 @@ class _SearchScreenState extends State<SearchScreen> {
   Timer? _debounce;
   int? _selectedId;
 
+  /// Read once, not subscribed — the listener below is what reacts to changes.
+  late final Session _session = SessionScope.read(context);
+
+  /// The origin the visible results were fetched from, so a session change that
+  /// didn't move the pin (a photo, a language) doesn't trigger a refetch.
+  GeoPoint? _fetchedFrom;
+
   /// 0 → map fully open, 1 → map collapsed. Driven by list scroll offset.
   double _collapse = 0;
 
@@ -56,6 +63,10 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
+    // The location prompt on app open writes the new point onto the session, so
+    // the results have to follow it — without this the first search of the day
+    // would still be measured from yesterday's site.
+    _session.addListener(_onSessionChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _results.load();
@@ -65,27 +76,44 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  /// Search origin: whatever the user set in the location picker, falling back
-  /// to the configured city centre for an account that has never set one.
+  /// Search origin: whatever the user set in the location picker or the on-open
+  /// prompt, falling back to the configured city centre for an account that has
+  /// never set one.
   GeoPoint get _origin {
-    final user = context.session.user;
+    final user = _session.user;
     return GeoPoint(
       user?.latitude ?? ApiConfig.fallbackLat,
       user?.longitude ?? ApiConfig.fallbackLng,
     );
   }
 
-  /// Opens the manual location picker; a save moves the origin, so the results
-  /// have to be fetched again from the new point.
-  Future<void> _changeLocation() async {
-    final saved = await LocationPickerScreen.push(context);
-    if (saved != true || !mounted) return;
-    setState(() {});
+  /// Re-runs the search from the new point whenever the saved location moves —
+  /// whichever route moved it (the on-open prompt, the picker, or a profile edit
+  /// on another device picked up by `GET /me`).
+  ///
+  /// The skill, radius, sort and keyword in [_filters] are deliberately left
+  /// alone: this is the same search, from somewhere else.
+  void _onSessionChanged() {
+    if (!mounted) return;
+    final origin = _origin;
+    final previous = _fetchedFrom;
+    if (previous != null &&
+        previous.lat == origin.lat &&
+        previous.lng == origin.lng) {
+      return;
+    }
     _results.refetchWith(_fetch);
+  }
+
+  /// Opens the manual location picker. Saving updates the session, which
+  /// [_onSessionChanged] turns into a refetch — nothing to do on the way back.
+  Future<void> _changeLocation() async {
+    await LocationPickerScreen.push(context);
   }
 
   Future<List<Labour>> _fetch() async {
     final origin = _origin;
+    _fetchedFrom = origin;
     final rows = await context.repo.searchLabours(
       lat: origin.lat,
       lng: origin.lng,
@@ -117,6 +145,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _session.removeListener(_onSessionChanged);
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
     _query.dispose();

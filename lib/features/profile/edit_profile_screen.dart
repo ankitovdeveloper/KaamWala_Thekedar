@@ -10,10 +10,10 @@ import '../../data/models/models.dart';
 import '../../data/session.dart';
 import '../../widgets/kw_async.dart';
 import '../../widgets/kw_button.dart';
-import '../../widgets/kw_common.dart';
 import '../../widgets/kw_field.dart';
 import '../../widgets/kw_scaffold.dart';
 import '../location/location_picker_screen.dart';
+import 'widgets/profile_photo_picker.dart';
 
 /// Edit form behind the Profile screen's "Profile Edit karein" button, backed
 /// by `POST /v1/thekedar/profile`.
@@ -179,7 +179,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     offset: 14,
                     children: [
                       Center(
-                        child: KwAvatar(
+                        // Writes through to the session, and this build reads
+                        // the user from there — so the new photo appears here
+                        // without the form having to track it.
+                        child: ProfilePhotoPicker(
+                          user: user,
                           initials: initialsOf(
                             _name.text.isEmpty ? user.name : _name.text,
                           ),

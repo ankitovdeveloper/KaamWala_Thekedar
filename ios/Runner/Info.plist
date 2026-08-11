@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Kaamwala Thekedar</string>
+	<string>KaamWala Thekedar</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,6 +26,18 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Shown by iOS when the location picker's "use my current location"
+	     button asks for a fix. Only ever requested in the foreground, from that
+	     one tap, so "when in use" is the right level. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>KaamWala needs your location to set your work address and find labour near you.</string>
+	<!-- Both asked for only by the profile photo picker, from the sheet's
+	     gallery / camera rows. Without them iOS terminates the app on the first
+	     pick instead of showing a permission prompt. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>KaamWala needs your photos so you can pick a profile picture.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>KaamWala needs the camera so you can take a profile picture.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

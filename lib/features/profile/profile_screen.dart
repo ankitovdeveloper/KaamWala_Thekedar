@@ -16,6 +16,7 @@ import '../../widgets/kw_scaffold.dart';
 import '../location/location_picker_screen.dart';
 import '../shell/home_shell.dart';
 import 'edit_profile_screen.dart';
+import 'widgets/profile_photo_picker.dart';
 
 /// Profile screen, backed by `GET /v1/thekedar/profile` — one call returns the
 /// user, the dashboard stats and the saved addresses.
@@ -28,9 +29,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _scroll = ScrollController();
-  late final Loadable<ProfileBundle> _profile = Loadable(
-    () => context.repo.profile(),
-  );
+  late final Loadable<ProfileBundle> _profile = Loadable(_fetch);
 
   double _offset = 0;
 
@@ -50,6 +49,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _scroll.dispose();
     _profile.dispose();
     super.dispose();
+  }
+
+  /// `GET /thekedar/profile` is the freshest view of the account, so its user
+  /// replaces the session's cached copy.
+  ///
+  /// Without this the screen and the forms behind it can disagree: the address
+  /// row below reads from the bundle, while the location picker and the edit
+  /// form prefill from `session.user` — which is only refreshed on a cold start.
+  /// An address saved from another device (or the last session) then shows in
+  /// the row but opens blank in the field that edits it.
+  Future<ProfileBundle> _fetch() async {
+    final bundle = await context.repo.profile();
+    if (mounted) SessionScope.read(context).updateUser(bundle.user);
+    return bundle;
   }
 
   Future<void> _editProfile(AppUser user) async {
@@ -258,12 +271,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               from: SlideFrom.none,
               beginScale: 0.7,
               duration: const Duration(milliseconds: 620),
-              child: KwAvatar(
-                initials: user.initials,
+              child: ProfilePhotoPicker(
+                user: user,
                 size: 76,
                 background: AppColors.black,
                 foreground: AppColors.yellow,
                 ring: AppColors.veil06,
+                // The picker already wrote the new user to the session; reload
+                // so the bundle this screen renders from agrees with it.
+                onChanged: (_) => _profile.load(silent: true),
               ),
             ),
             Gap.vXl,

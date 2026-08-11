@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../api/api_exception.dart';
 import '../mock_data.dart';
 import '../models/models.dart';
@@ -267,6 +269,18 @@ class MockRepository implements KaamWalaRepository {
     );
     return _delayed(_user);
   }
+
+  /// Both no-ops: there is no file store behind the mock, so a demo run has
+  /// nowhere to put the bytes and no URL to serve them from. The avatar keeps
+  /// showing its initials, which is what the seeded user has anyway.
+  @override
+  Future<AppUser> updateProfilePhoto({
+    required Uint8List bytes,
+    required String filename,
+  }) => _delayed(_user);
+
+  @override
+  Future<AppUser> removeProfilePhoto() => _delayed(_user);
 
   @override
   Future<ProfileBundle> profile() {

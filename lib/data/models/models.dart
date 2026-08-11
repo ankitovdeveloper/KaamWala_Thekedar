@@ -232,6 +232,7 @@ class AppUser {
     this.address,
     this.latitude,
     this.longitude,
+    this.locationUpdatedAt,
     this.language = 'hi',
     this.notifyPush = true,
     this.notifyWhatsapp = true,
@@ -251,6 +252,12 @@ class AppUser {
   final String? address;
   final double? latitude;
   final double? longitude;
+
+  /// When [latitude]/[longitude] were last confirmed by the user
+  /// (`users.location_updated_at`), which is what the app's periodic location
+  /// prompt is timed off. Null on an older deploy that doesn't send the column —
+  /// [Session] then falls back to its own locally stored stamp.
+  final DateTime? locationUpdatedAt;
   final String language;
   final bool notifyPush;
   final bool notifyWhatsapp;
@@ -275,6 +282,7 @@ class AppUser {
     address: json.strOrNull('address'),
     latitude: json['latitude'] == null ? null : json.dbl('latitude'),
     longitude: json['longitude'] == null ? null : json.dbl('longitude'),
+    locationUpdatedAt: json.date('location_updated_at'),
     language: json.strOrNull('language') ?? 'hi',
     notifyPush: json.flag('notify_push', true),
     notifyWhatsapp: json.flag('notify_whatsapp', true),
@@ -295,6 +303,8 @@ class AppUser {
     'address': address,
     'latitude': latitude,
     'longitude': longitude,
+    // ISO so the cached copy reparses through the same path as the server's.
+    'location_updated_at': locationUpdatedAt?.toIso8601String(),
     'language': language,
     'notify_push': notifyPush,
     'notify_whatsapp': notifyWhatsapp,
@@ -319,6 +329,7 @@ class AppUser {
     String? address,
     double? latitude,
     double? longitude,
+    DateTime? locationUpdatedAt,
     String? language,
     bool? notifyPush,
     bool? notifyWhatsapp,
@@ -334,6 +345,7 @@ class AppUser {
     address: address ?? this.address,
     latitude: latitude ?? this.latitude,
     longitude: longitude ?? this.longitude,
+    locationUpdatedAt: locationUpdatedAt ?? this.locationUpdatedAt,
     language: language ?? this.language,
     notifyPush: notifyPush ?? this.notifyPush,
     notifyWhatsapp: notifyWhatsapp ?? this.notifyWhatsapp,
