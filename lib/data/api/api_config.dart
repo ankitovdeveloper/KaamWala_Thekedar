@@ -15,8 +15,8 @@
 abstract final class ApiConfig {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    // defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
-    defaultValue: 'http://127.0.0.1:8000/api/v1',
+    defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
+    // defaultValue: 'http://127.0.0.1:8000/api/v1',
   );
 
   /// Forces the mock repository even when a base URL is present — handy for
@@ -45,7 +45,10 @@ abstract final class ApiConfig {
   /// Empty means "no key configured" — the map falls back to the stylised
   /// canvas rather than showing Google's grey error tiles, which also keeps
   /// widget tests renderable.
-  static const mapsApiKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
+  static const mapsApiKey = String.fromEnvironment(
+    'GOOGLE_MAPS_API_KEY',
+    defaultValue: 'AIzaSyCS3p2G396VVvcEhH3yMgDzlK1t1hRd-w4',
+  );
 
   static bool get hasMapsKey => mapsApiKey.isNotEmpty;
 

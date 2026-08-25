@@ -69,11 +69,32 @@ class LabourFilters {
   /// The parts the API can't express. `is_on_duty` is already enforced server
   /// side, so the availability toggle is only meaningful for mock data.
   List<Labour> applyLocal(List<Labour> input) {
-    return input.where((l) {
+    final filtered = input.where((l) {
       if (availableOnly && !l.isOnDuty) return false;
       if (l.dailyRate > maxRate) return false;
+
+      // Filter by skill if selected
+      if (skillId != null) {
+        final hasSkill = l.skills.any((s) => s.id == skillId);
+        if (!hasSkill) return false;
+      }
+
       return true;
     }).toList();
+
+    switch (sort) {
+      case LabourSort.distance:
+        filtered.sort((a, b) => (a.distanceKm ?? double.infinity)
+            .compareTo(b.distanceKm ?? double.infinity));
+      case LabourSort.rating:
+        filtered.sort((a, b) => b.avgRating.compareTo(a.avgRating));
+      case LabourSort.priceLow:
+        filtered.sort((a, b) => a.dailyRate.compareTo(b.dailyRate));
+      case LabourSort.priceHigh:
+        filtered.sort((a, b) => b.dailyRate.compareTo(a.dailyRate));
+    }
+
+    return filtered;
   }
 }
 

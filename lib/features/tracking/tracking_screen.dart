@@ -84,6 +84,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     previous: _session.previous?.position,
                     destination: latest.destination ?? widget.booking.site,
                     stage: latest.stage,
+                    routePoints: _session.routePoints,
                   ),
                 },
               ),

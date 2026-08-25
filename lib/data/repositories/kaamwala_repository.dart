@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../models/models.dart';
 
@@ -44,6 +45,9 @@ abstract interface class KaamWalaRepository {
   /// `GET /thekedar/labour/{id}`
   Future<Labour> labourDetail(int id);
 
+  /// `GET /thekedar/all-labours-for-search`
+  Future<List<Labour>> allLaboursForSearch();
+
   /// `GET /skills` — master list for the filter sheet.
   Future<List<Skill>> skills();
 
@@ -76,6 +80,9 @@ abstract interface class KaamWalaRepository {
   /// `GET /thekedar/bookings/{id}/track` — one sample of the worker's
   /// position. Callers poll this; see `TrackingSession`.
   Future<TrackingUpdate> trackBooking(int bookingId);
+
+  /// Hits Google Directions API to get the road path between two points.
+  Future<List<LatLng>> getRoutePolyline(LatLng origin, LatLng destination);
 
   /// `POST /thekedar/bookings/{id}/review`
   Future<void> reviewBooking({

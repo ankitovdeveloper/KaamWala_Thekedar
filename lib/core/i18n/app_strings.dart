@@ -104,6 +104,8 @@ class AppStrings {
   String get searching => 'Dhoond rahe hain...';
   String get noneFound => 'Koi nahi mila';
   String labourFound(int count) => '$count kaam wale milein paas mein';
+  String get allLaboursMap => 'Sab Kaam Wale';
+  String get exploreMap => 'Map par dekhein';
   String get noLabourTitle => 'Koi kaam wala nahi mila';
   String get noLabourMessage =>
       'Filter thoda kam karein ya doosra skill try karein.';
@@ -548,6 +550,10 @@ class _Hindi extends AppStrings {
   String get noneFound => 'कोई नहीं मिला';
   @override
   String labourFound(int count) => 'आस-पास $count कारीगर मिले';
+  @override
+  String get allLaboursMap => 'सब कारीगर मैप';
+  @override
+  String get exploreMap => 'मैप पर देखें';
   @override
   String get noLabourTitle => 'कोई कारीगर नहीं मिला';
   @override
@@ -1197,6 +1203,10 @@ class _English extends AppStrings {
   @override
   String labourFound(int count) => '$count workers found nearby';
   @override
+  String get allLaboursMap => 'All Labours Map';
+  @override
+  String get exploreMap => 'Explore on Map';
+  @override
   String get noLabourTitle => 'No workers found';
   @override
   String get noLabourMessage =>
@@ -1800,6 +1810,10 @@ class _Bhojpuri extends _Hindi {
   String get noneFound => 'केहू ना मिलल';
   @override
   String labourFound(int count) => 'लगे-बगल $count कारीगर मिललन';
+  @override
+  String get allLaboursMap => 'सब कारीगर मैप';
+  @override
+  String get exploreMap => 'मैप पर देखीं';
   @override
   String get noLabourTitle => 'कवनो कारीगर ना मिलल';
   @override

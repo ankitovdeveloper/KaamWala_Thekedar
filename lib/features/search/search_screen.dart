@@ -2,14 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../core/animations/entrance.dart';
 import '../../core/animations/pressable.dart';
 import '../../core/async/loadable.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_typography.dart';
 import '../../data/api/api_config.dart';
 import '../../data/models/models.dart';
@@ -24,7 +22,6 @@ import 'widgets/filter_sheet.dart';
 import 'widgets/labour_card.dart';
 import 'widgets/search_map.dart';
 
-/// Map + list backed by `GET /v1/thekedar/labour`.
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -33,8 +30,8 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final _scroll = ScrollController();
   final _query = TextEditingController();
+  final _sheetController = DraggableScrollableController();
 
   late final Loadable<List<Labour>> _results = Loadable(_fetch);
   late final Loadable<List<Skill>> _skills = Loadable(
@@ -46,39 +43,20 @@ class _SearchScreenState extends State<SearchScreen> {
   Timer? _debounce;
   int? _selectedId;
 
-  /// Read once, not subscribed — the listener below is what reacts to changes.
   late final Session _session = SessionScope.read(context);
-
-  /// The origin the visible results were fetched from, so a session change that
-  /// didn't move the pin (a photo, a language) doesn't trigger a refetch.
   GeoPoint? _fetchedFrom;
-
-  /// 0 → map fully open, 1 → map collapsed. Driven by list scroll offset.
-  double _collapse = 0;
-
-  static const _mapMax = 200.0;
-  static const _mapMin = 96.0;
 
   @override
   void initState() {
     super.initState();
-    _scroll.addListener(_onScroll);
-    // The location prompt on app open writes the new point onto the session, so
-    // the results have to follow it — without this the first search of the day
-    // would still be measured from yesterday's site.
     _session.addListener(_onSessionChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _results.load();
-      // The filter sheet needs the master list, but the screen doesn't wait
-      // on it — a failed skills call must not block search results.
       _skills.load();
     });
   }
 
-  /// Search origin: whatever the user set in the location picker or the on-open
-  /// prompt, falling back to the configured city centre for an account that has
-  /// never set one.
   GeoPoint get _origin {
     final user = _session.user;
     return GeoPoint(
@@ -87,12 +65,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// Re-runs the search from the new point whenever the saved location moves —
-  /// whichever route moved it (the on-open prompt, the picker, or a profile edit
-  /// on another device picked up by `GET /me`).
-  ///
-  /// The skill, radius, sort and keyword in [_filters] are deliberately left
-  /// alone: this is the same search, from somewhere else.
   void _onSessionChanged() {
     if (!mounted) return;
     final origin = _origin;
@@ -105,8 +77,6 @@ class _SearchScreenState extends State<SearchScreen> {
     _results.refetchWith(_fetch);
   }
 
-  /// Opens the manual location picker. Saving updates the session, which
-  /// [_onSessionChanged] turns into a refetch — nothing to do on the way back.
   Future<void> _changeLocation() async {
     await LocationPickerScreen.push(context);
   }
@@ -114,26 +84,35 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<List<Labour>> _fetch() async {
     final origin = _origin;
     _fetchedFrom = origin;
-    final rows = await context.repo.searchLabours(
-      lat: origin.lat,
-      lng: origin.lng,
-      skillId: _filters.skillId,
-      query: _search,
-      radiusKm: _filters.radiusKm,
-      sort: _filters.sort,
-    );
-    // Rate cap and the availability toggle have no query parameter.
-    return _filters.applyLocal(rows);
+    
+    // Fetch all labours from the new API
+    final allLabours = await context.repo.allLaboursForSearch();
+    
+    final query = _search.trim().toLowerCase();
+    
+    // Filter locally based on distance from origin and current radius
+    final filtered = allLabours.where((labour) {
+      // Filter by search query (name or city)
+      if (query.isNotEmpty) {
+        final matches = labour.name.toLowerCase().contains(query) ||
+            (labour.city?.toLowerCase().contains(query) ?? false);
+        if (!matches) return false;
+      }
+
+      if (labour.latitude == null || labour.longitude == null) return false;
+
+      final labourPos = GeoPoint(labour.latitude!, labour.longitude!);
+      final distance = origin.distanceKmTo(labourPos);
+
+      return distance <= _filters.radiusKm;
+    }).map((l) {
+      final labourPos = GeoPoint(l.latitude!, l.longitude!);
+      return l.copyWith(distanceKm: origin.distanceKmTo(labourPos));
+    }).toList();
+
+    return _filters.applyLocal(filtered);
   }
 
-  void _onScroll() {
-    final next = (_scroll.offset / 130).clamp(0.0, 1.0);
-    if ((next - _collapse).abs() > 0.005) {
-      setState(() => _collapse = next);
-    }
-  }
-
-  /// Typing shouldn't fire a request per keystroke.
   void _onQueryChanged(String value) {
     _search = value;
     _debounce?.cancel();
@@ -146,11 +125,10 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _debounce?.cancel();
     _session.removeListener(_onSessionChanged);
-    _scroll.removeListener(_onScroll);
-    _scroll.dispose();
     _query.dispose();
     _results.dispose();
     _skills.dispose();
+    _sheetController.dispose();
     super.dispose();
   }
 
@@ -158,12 +136,11 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _openDetail(Labour labour) {
     setState(() => _selectedId = labour.id);
-    if (context.usesTwoPane) return; // Detail renders in the side pane.
+    if (context.usesTwoPane) return;
     Navigator.of(context).pushNamed(Routes.labourDetail, arguments: labour);
   }
 
   void _connect(Labour labour) {
-    // "Connect" opens the profile, where Book Now creates the booking.
     _openDetail(labour);
   }
 
@@ -188,6 +165,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return KwScaffold(
+      // We handle the safe area and status bar padding internally.
       body: Column(
         children: [
           _topBar(),
@@ -196,22 +174,74 @@ class _SearchScreenState extends State<SearchScreen> {
               listenable: _results,
               builder: (context, _) {
                 final rows = _results.value ?? const <Labour>[];
-                if (!context.usesTwoPane) {
-                  return _mapAndList(rows, collapsible: true);
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                
+                return Stack(
                   children: [
-                    SizedBox(
-                      width: Breakpoints.listPaneWidth,
-                      child: _mapAndList(rows, collapsible: false),
+                    // Background Map
+                    Positioned.fill(
+                      child: SearchMap(
+                        key: ValueKey('map-${_origin.lat}-${_origin.lng}-${rows.length}-${_filters.radiusKm}'),
+                        origin: _origin,
+                        radiusKm: _filters.radiusKm,
+                        labours: rows,
+                        selectedId: _selectedId,
+                        onPinTap: _openDetail,
+                        padding: EdgeInsets.only(
+                          top: MediaQuery.of(context).padding.top + 140,
+                          bottom: MediaQuery.of(context).size.height * 0.4,
+                        ),
+                      ),
                     ),
-                    const VerticalDivider(
-                      width: 0.5,
-                      thickness: 0.5,
-                      color: AppColors.border,
+
+                    // Floating Search & Filter Bar (just below the restored header)
+                    Positioned(
+                      top: Gap.lg,
+                      left: Gap.lg,
+                      right: Gap.lg,
+                      child: _floatingSearchBox(),
                     ),
-                    Expanded(child: _detailPane(rows)),
+
+                    // Draggable Labour List
+                    _draggableList(rows),
+
+                    // Floating Location/Re-center button
+                    Positioned(
+                      bottom: (MediaQuery.of(context).size.height * 0.4) + 20,
+                      right: Gap.lg,
+                      child: Pressable(
+                        onTap: () {
+                          _sheetController.animateTo(
+                            0.15,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: const BoxDecoration(
+                            color: AppColors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: AppColors.floatingShadow,
+                          ),
+                          child: const Icon(Icons.my_location_rounded, size: 20),
+                        ),
+                      ),
+                    ),
+
+                    // Wide screen detail pane
+                    if (context.usesTwoPane && _selectedId != null)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: MediaQuery.of(context).size.width - Breakpoints.listPaneWidth,
+                        child: Material(
+                          elevation: 16,
+                          color: AppColors.canvas,
+                          child: _detailPane(rows),
+                        ),
+                      ),
                   ],
                 );
               },
@@ -221,8 +251,6 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
     );
   }
-
-  // ── Header ────────────────────────────────────────────────────────────────
 
   Widget _topBar() {
     final s = context.s;
@@ -235,57 +263,40 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Row(
           children: [
             Expanded(
-              child: FadeSlideIn(
-                from: SlideFrom.left,
-                offset: 14,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      s.yourLocation,
-                      style: AppType.micro.copyWith(
-                        color: AppColors.black.withValues(alpha: 0.5),
-                      ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    s.yourLocation,
+                    style: AppType.micro.copyWith(
+                      color: AppColors.black.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w500,
                     ),
-                    Pressable(
-                      scale: 0.97,
-                      onTap: _changeLocation,
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on_rounded,
-                            size: 16,
-                            color: AppColors.black,
-                          ),
-                          const SizedBox(width: 3),
-                          Flexible(
-                            child: Text(
-                              location,
-                              style: AppType.bodyStrong.copyWith(fontSize: 15),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 18,
-                            color: AppColors.black,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
+          Pressable(
+            onTap: _changeLocation,
+            child: Row(
+              children: [
+                const Icon(Icons.location_on_rounded, size: 16, color: AppColors.black),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    location,
+                    style: AppType.bodyStrong.copyWith(fontSize: 15),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+                const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+              ],
+            ),
+          ),
+                ],
               ),
             ),
             Gap.hXl,
-            FadeSlideIn(
-              delay: const Duration(milliseconds: 100),
-              from: SlideFrom.right,
-              offset: 14,
-              child: _notificationBell(),
-            ),
+            _notificationBell(),
           ],
         ),
       ),
@@ -294,9 +305,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _notificationBell() {
     return Pressable(
-      scale: 0.88,
       onTap: () => _toast(context.s.noNotifications),
-      semanticLabel: context.s.notifications,
       child: Container(
         width: 36,
         height: 36,
@@ -304,263 +313,113 @@ class _SearchScreenState extends State<SearchScreen> {
           color: AppColors.veil10,
           shape: BoxShape.circle,
         ),
-        child: const Icon(
-          Icons.notifications_none_rounded,
-          size: 19,
-          color: AppColors.black,
-        ),
+        child: const Icon(Icons.notifications_none_rounded, size: 19, color: AppColors.black),
       ),
     );
   }
 
-  // ── Map + list ────────────────────────────────────────────────────────────
-
-  Widget _mapAndList(List<Labour> rows, {required bool collapsible}) {
-    final mapHeight = collapsible
-        ? _mapMax - (_mapMax - _mapMin) * _collapse
-        : 170.0;
-
-    return Column(
-      children: [
-        Stack(
-          children: [
-            SearchMap(
-              origin: _origin,
-              radiusKm: _filters.radiusKm,
-              labours: rows,
-              selectedId: _selectedId,
-              height: mapHeight,
-              onPinTap: _openDetail,
-            ),
-            // Radius is what the map is actually showing, so it gets a control
-            // on the map rather than living only inside the filter sheet.
-            Positioned(
-              right: Gap.xxl,
-              bottom: Gap.xl,
-              child: AnimatedOpacity(
-                duration: Motion.fast,
-                opacity: (1 - _collapse * 1.4).clamp(0.0, 1.0),
-                child: IgnorePointer(
-                  ignoring: _collapse > 0.6,
-                  child: _radiusChip(),
-                ),
-              ),
-            ),
-            Positioned(
-              top: Gap.xl,
-              left: Gap.xxl,
-              right: Gap.xxl,
-              // Search bar fades as the map collapses under it.
-              child: IgnorePointer(
-                ignoring: _collapse > 0.85,
-                child: Opacity(
-                  opacity: (1 - _collapse * 1.15).clamp(0.0, 1.0),
-                  child: FadeSlideIn(
-                    delay: const Duration(milliseconds: 160),
-                    from: SlideFrom.top,
-                    child: KwSearchBar(
-                      controller: _query,
-                      hintText: context.s.searchHint,
-                      onChanged: _onQueryChanged,
-                      trailing: _filterButton(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        Expanded(child: _list(rows)),
-      ],
-    );
-  }
-
-  /// Shows the radius the circle on the map represents, and opens a slider to
-  /// change it. Kept to one tap because it is the control users reach for most.
-  Widget _radiusChip() {
-    return Pressable(
-      scale: 0.93,
-      onTap: _openRadius,
-      semanticLabel: context.s.changeRadius,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: Gap.xl, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: Radii.rPill,
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppColors.floatingShadow,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.my_location_rounded,
-              size: 14,
-              color: AppColors.black,
-            ),
-            Gap.hXs,
-            Text(
-              '${_filters.radiusKm} km',
-              style: AppType.buttonSmall.copyWith(fontSize: 12),
-            ),
-          ],
-        ),
+  Widget _floatingSearchBox() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: KwSearchBar(
+        controller: _query,
+        hintText: context.s.searchHint,
+        onChanged: _onQueryChanged,
+        trailing: _filterButton(),
       ),
     );
-  }
-
-  Future<void> _openRadius() async {
-    final picked = await RadiusSheet.show(context, _filters.radiusKm);
-    if (picked == null || !mounted || picked == _filters.radiusKm) return;
-    setState(() => _filters = _filters.copyWith(radiusKm: picked));
-    _results.refetchWith(_fetch);
   }
 
   Widget _filterButton() {
     final count = _filters.activeCount;
     return Pressable(
-      scale: 0.92,
       onTap: _openFilters,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: Gap.xl, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: 6),
         decoration: BoxDecoration(
           color: AppColors.yellow,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.tune_rounded, size: 13, color: AppColors.black),
-            Gap.hXs,
-            Text(
-              context.s.filter,
-              style: AppType.buttonSmall.copyWith(fontSize: 12),
-            ),
-            AnimatedSize(
-              duration: Motion.fast,
-              curve: Motion.enter,
-              child: count == 0
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(left: 5),
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        alignment: Alignment.center,
-                        decoration: const BoxDecoration(
-                          color: AppColors.black,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '$count',
-                          style: AppType.nano.copyWith(
-                            fontSize: 9,
-                            color: AppColors.yellow,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-            ),
+            const Icon(Icons.tune_rounded, size: 16),
+            if (count > 0) ...[
+              Gap.hXs,
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(color: AppColors.black, shape: BoxShape.circle),
+                child: Text('$count', style: AppType.nano.copyWith(color: AppColors.yellow, fontSize: 8)),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _list(List<Labour> rows) {
-    return RefreshIndicator(
-      onRefresh: _refresh,
-      color: AppColors.black,
-      backgroundColor: AppColors.yellow,
-      child: CustomScrollView(
-        controller: _scroll,
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-        slivers: [
-          SliverContentWidth(
-            sliver: SliverPadding(
-              padding: EdgeInsets.fromLTRB(
-                context.pagePadding,
-                Gap.x3l,
-                context.pagePadding,
-                Gap.md,
-              ),
-              sliver: SliverToBoxAdapter(child: _listHeader(rows.length)),
-            ),
+  Widget _draggableList(List<Labour> rows) {
+    return DraggableScrollableSheet(
+      controller: _sheetController,
+      initialChildSize: 0.4,
+      minChildSize: 0.15,
+      maxChildSize: 0.95,
+      snap: true,
+      snapSizes: const [0.15, 0.4, 0.95],
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2)),
+            ],
           ),
-          if (_results.isInitialLoad)
-            SliverContentWidth(
-              sliver: SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: context.pagePadding),
-                sliver: SliverList.builder(
-                  itemCount: 3,
-                  itemBuilder: (_, _) => const LabourCardSkeleton(),
+          child: Column(
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            )
-          else if (_results.error != null && rows.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: ApiErrorState(
-                error: _results.error!,
-                onRetry: () => _results.load(),
+              
+              // Header
+              Padding(
+                padding: const EdgeInsets.only(left: Gap.xl, right: Gap.xl, bottom: Gap.md),
+                child: _listHeader(rows.length),
               ),
-            )
-          else if (rows.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: KwEmptyState(
-                icon: Icons.person_search_rounded,
-                title: context.s.noLabourTitle,
-                message: context.s.noLabourMessage,
-                action: _filters.isDefault
-                    ? null
-                    : TextButton(
-                        onPressed: () {
-                          setState(
-                            () => _filters = LabourFilters(sort: _filters.sort),
-                          );
-                          _results.refetchWith(_fetch);
-                        },
-                        child: Text(
-                          context.s.clearFilters,
-                          style: AppType.buttonSmall.copyWith(
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
+
+              // List
+              Expanded(
+                child: _results.isInitialLoad
+                    ? _skeletonList()
+                    : rows.isEmpty
+                        ? _emptyState()
+                        : _results.error != null
+                            ? _errorState()
+                            : _actualList(rows, scrollController),
               ),
-            )
-          else
-            SliverContentWidth(
-              sliver: SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: context.pagePadding),
-                sliver: SliverList.builder(
-                  itemCount: rows.length,
-                  itemBuilder: (context, i) {
-                    final labour = rows[i];
-                    return FadeSlideIn.staggered(
-                      // Keying on id replays the entrance when the result set
-                      // changes, but not when a card merely moves.
-                      key: ValueKey('card-${labour.id}'),
-                      index: i,
-                      beginScale: 0.97,
-                      child: LabourCard(
-                        labour: labour,
-                        selected: labour.id == _selectedId,
-                        onTap: () => _openDetail(labour),
-                        onConnect: () => _connect(labour),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          const SliverToBoxAdapter(child: SizedBox(height: Gap.x4l)),
-        ],
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -569,48 +428,32 @@ class _SearchScreenState extends State<SearchScreen> {
     return Row(
       children: [
         Expanded(
-          child: AnimatedSwitcher(
-            duration: Motion.fast,
-            child: Text(
-              key: ValueKey('$count-${_results.isLoading}'),
-              _results.isInitialLoad
-                  ? s.searching
-                  : count == 0
-                  ? s.noneFound
-                  : s.labourFound(count),
-              style: AppType.caption.copyWith(fontSize: 13),
-            ),
+          child: Text(
+            _results.isInitialLoad
+                ? s.searching
+                : count == 0
+                    ? s.noneFound
+                    : s.labourFound(count),
+            style: AppType.bodyStrong,
           ),
         ),
         Pressable(
-          scale: 0.94,
           onTap: _openSort,
           child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Gap.lg,
-              vertical: Gap.xs,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: Radii.rPill,
+              color: AppColors.canvas,
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.border),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const Icon(Icons.sort_rounded, size: 14),
+                Gap.hSm,
                 Text(
                   _filters.sort.labelIn(s),
-                  style: AppType.micro.copyWith(
-                    fontSize: 12,
-                    color: AppColors.black,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Gap.hXs,
-                const Icon(
-                  Icons.swap_vert_rounded,
-                  size: 14,
-                  color: AppColors.black,
+                  style: AppType.buttonSmall.copyWith(fontSize: 12),
                 ),
               ],
             ),
@@ -620,36 +463,74 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// Wide-window right pane: shows the selected worker, or a prompt.
-  Widget _detailPane(List<Labour> rows) {
-    final selected = rows.where((l) => l.id == _selectedId).firstOrNull;
+  Widget _actualList(List<Labour> rows, ScrollController scrollController) {
+    return ListView.builder(
+      controller: scrollController,
+      padding: EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, MediaQuery.of(context).padding.bottom + Gap.xl),
+      itemCount: rows.length,
+      itemBuilder: (context, i) {
+        final labour = rows[i];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: Gap.md),
+          child: LabourCard(
+            labour: labour,
+            selected: labour.id == _selectedId,
+            onTap: () => _openDetail(labour),
+            onConnect: () => _connect(labour),
+          ),
+        );
+      },
+    );
+  }
 
-    return AnimatedSwitcher(
-      duration: Motion.normal,
-      switchInCurve: Motion.enter,
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: SlideTransition(
-          position: Tween(
-            begin: const Offset(0.03, 0),
-            end: Offset.zero,
-          ).animate(animation),
-          child: child,
+  Widget _skeletonList() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: Gap.lg),
+      itemCount: 3,
+      itemBuilder: (_, _) => const Padding(
+        padding: EdgeInsets.only(bottom: Gap.md),
+        child: LabourCardSkeleton(),
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: Gap.x3l),
+        child: KwEmptyState(
+          icon: Icons.person_search_rounded,
+          title: context.s.noLabourTitle,
+          message: context.s.noLabourMessage,
+          action: _filters.isDefault
+              ? null
+              : TextButton(
+                  onPressed: () {
+                    setState(() => _filters = LabourFilters(sort: _filters.sort));
+                    _results.refetchWith(_fetch);
+                  },
+                  child: Text(context.s.clearFilters),
+                ),
         ),
       ),
-      child: selected == null
-          ? KwEmptyState(
-              key: const ValueKey('empty-pane'),
-              icon: Icons.touch_app_rounded,
-              title: context.s.pickLabourTitle,
-              message: context.s.pickLabourMessage,
-            )
-          : LabourDetailScreen(
-              key: ValueKey('pane-${selected.id}'),
-              labourId: selected.id,
-              preview: selected,
-              embedded: true,
-            ),
+    );
+  }
+
+  Widget _errorState() {
+    return ApiErrorState(
+      error: _results.error!,
+      onRetry: () => _results.load(),
+    );
+  }
+
+  Widget _detailPane(List<Labour> rows) {
+    final selected = rows.where((l) => l.id == _selectedId).firstOrNull;
+    if (selected == null) return const SizedBox.shrink();
+    return LabourDetailScreen(
+      key: ValueKey('pane-${selected.id}'),
+      labourId: selected.id,
+      preview: selected,
+      embedded: true,
     );
   }
 

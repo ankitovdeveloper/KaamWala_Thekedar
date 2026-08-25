@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
 import '../api/api_exception.dart';
 import '../mock_data.dart';
 import '../models/models.dart';
@@ -111,6 +113,9 @@ class MockRepository implements KaamWalaRepository {
     final labour = Mock.labourById(id);
     return _delayed(labour.copyWith(isSaved: _saved.contains(id)));
   }
+
+  @override
+  Future<List<Labour>> allLaboursForSearch() => _delayed(Mock.labours);
 
   @override
   Future<List<Skill>> skills() => _delayed(Mock.allSkills);
@@ -230,6 +235,16 @@ class MockRepository implements KaamWalaRepository {
 
     _advanceSimulations();
     return _delayed(job.sample());
+  }
+
+  @override
+  Future<List<LatLng>> getRoutePolyline(
+    LatLng origin,
+    LatLng destination,
+  ) async {
+    // The mock doesn't call Google; it just returns a straight line so the
+    // polyline logic is exercised without needing an API key.
+    return _delayed([origin, destination]);
   }
 
   @override

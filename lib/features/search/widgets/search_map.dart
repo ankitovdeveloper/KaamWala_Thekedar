@@ -3,18 +3,14 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../core/maps/map_styles.dart';
+import '../../../core/maps/marker_generator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/models.dart';
 import '../../../data/session.dart';
 import '../../../widgets/kw_map.dart';
-import 'map_canvas.dart';
 
 /// The search map: everyone inside the radius, drawn around the search origin.
-///
-/// The circle is the search itself made visible — its size is the `radius` the
-/// API filters by, so widening the slider visibly grows the area and brings
-/// more pins in. Without a Maps key this degrades to the stylised [MapCanvas],
-/// which keeps the screen working and the widget tests renderable.
 class SearchMap extends StatefulWidget {
   const SearchMap({
     super.key,
@@ -23,7 +19,8 @@ class SearchMap extends StatefulWidget {
     required this.labours,
     required this.onPinTap,
     this.selectedId,
-    this.height = 200,
+    this.height,
+    this.padding = EdgeInsets.zero,
   });
 
   final GeoPoint origin;
@@ -31,30 +28,111 @@ class SearchMap extends StatefulWidget {
   final List<Labour> labours;
   final ValueChanged<Labour> onPinTap;
   final int? selectedId;
-  final double height;
+  final double? height;
+  final EdgeInsets padding;
 
   @override
   State<SearchMap> createState() => _SearchMapState();
 }
 
 class _SearchMapState extends State<SearchMap> {
+  static final LatLngBounds _indiaBounds = LatLngBounds(
+    southwest: const LatLng(6.4626999, 68.1097),
+    northeast: const LatLng(35.513327, 97.3953586),
+  );
+
   GoogleMapController? _controller;
+  final Map<int, BitmapDescriptor> _customIcons = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCustomIcons();
+  }
 
   @override
   void didUpdateWidget(SearchMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Re-frame when the area being searched changes, not when results churn
-    // inside an unchanged area — otherwise the map jumps on every keystroke.
+    if (oldWidget.labours != widget.labours) {
+      _loadCustomIcons();
+    }
+    // Re-frame when the area being searched changes, or when labours data updates.
     if (oldWidget.radiusKm != widget.radiusKm ||
-        oldWidget.origin != widget.origin) {
+        oldWidget.origin != widget.origin ||
+        oldWidget.labours != widget.labours) {
       _fitRadius();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller = null;
+    super.dispose();
+  }
+
+  Future<void> _loadCustomIcons() async {
+    for (final labour in widget.labours) {
+      if (labour.skills.isNotEmpty) {
+        final icon = labour.skills.first.emoji;
+        final isSelected = labour.id == widget.selectedId;
+        
+        if (!_customIcons.containsKey(labour.id) || 
+            (isSelected && !_customIcons.containsKey(-labour.id))) {
+          final bitmap = await MarkerGenerator.createCustomMarkerBitmap(
+            icon,
+            selected: isSelected,
+          );
+          if (mounted) {
+            setState(() {
+              // Use negative ID for selected markers in cache to avoid collision
+              _customIcons[isSelected ? -labour.id : labour.id] = bitmap;
+            });
+          }
+        }
+      }
     }
   }
 
   void _fitRadius() {
     final controller = _controller;
-    if (controller == null) return;
-    controller.animateCamera(CameraUpdate.newLatLngBounds(_radiusBounds(), 24));
+    if (controller == null || !mounted) return;
+
+    final bounds = _calculateBounds();
+    // Use a slightly larger padding for street level to ensure context
+    controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
+  }
+
+  LatLngBounds _calculateBounds() {
+    final radiusBounds = _radiusBounds();
+    
+    if (widget.labours.isEmpty) return radiusBounds;
+
+    double? minLat, maxLat, minLng, maxLng;
+
+    for (final labour in widget.labours) {
+      if (labour.latitude != null && labour.longitude != null) {
+        final lat = labour.latitude!;
+        final lng = labour.longitude!;
+        
+        minLat = minLat == null ? lat : math.min(minLat, lat);
+        maxLat = maxLat == null ? lat : math.max(maxLat, lat);
+        minLng = minLng == null ? lng : math.min(minLng, lng);
+        maxLng = maxLng == null ? lng : math.max(maxLng, lng);
+      }
+    }
+
+    if (minLat == null) return radiusBounds;
+
+    // Include the user's origin in the bounds too
+    minLat = math.min(minLat, widget.origin.lat);
+    maxLat = math.max(maxLat!, widget.origin.lat);
+    minLng = math.min(minLng!, widget.origin.lng);
+    maxLng = math.max(maxLng!, widget.origin.lng);
+
+    return LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
   }
 
   /// The square that just contains the search circle.
@@ -80,33 +158,37 @@ class _SearchMapState extends State<SearchMap> {
 
   Set<Marker> get _markers {
     final s = context.s;
-    return {
-    Marker(
-      markerId: const MarkerId('origin'),
-      position: widget.origin.toLatLng(),
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-      infoWindow: InfoWindow(title: s.youAreHere),
-      zIndexInt: 2,
-    ),
-    for (final labour in widget.labours)
-      if (labour.latLng case final position?)
-        Marker(
-          markerId: MarkerId('labour-${labour.id}'),
-          position: position.toLatLng(),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            labour.id == widget.selectedId
-                ? BitmapDescriptor.hueOrange
-                : BitmapDescriptor.hueYellow,
+    final Set<Marker> markers = {};
+
+    // Labour markers from API
+    for (final labour in widget.labours) {
+      if (labour.latitude != null && labour.longitude != null) {
+        final position = LatLng(labour.latitude!, labour.longitude!);
+        final isSelected = labour.id == widget.selectedId;
+        final icon = _customIcons[isSelected ? -labour.id : labour.id];
+
+        markers.add(
+          Marker(
+            markerId: MarkerId('labour-${labour.id}'),
+            position: position,
+            icon: icon ??
+                BitmapDescriptor.defaultMarkerWithHue(
+                  isSelected
+                      ? BitmapDescriptor.hueOrange
+                      : BitmapDescriptor.hueYellow,
+                ),
+            zIndexInt: isSelected ? 10 : 5,
+            infoWindow: InfoWindow(
+              title: labour.name,
+              snippet:
+                  '₹${labour.dailyRate}${s.perDay} · ${labour.primarySkillIn(s)}',
+              onTap: () => widget.onPinTap(labour),
+            ),
           ),
-          infoWindow: InfoWindow(
-            title: labour.name,
-            snippet:
-                '₹${labour.dailyRate}${s.perDay} · '
-                '${labour.primarySkillIn(s)}',
-          ),
-          onTap: () => widget.onPinTap(labour),
-        ),
-    };
+        );
+      }
+    }
+    return markers;
   }
 
   Set<Circle> get _circles => {
@@ -114,34 +196,38 @@ class _SearchMapState extends State<SearchMap> {
       circleId: const CircleId('radius'),
       center: widget.origin.toLatLng(),
       radius: widget.radiusKm * 1000,
-      fillColor: AppColors.yellow.withValues(alpha: 0.14),
-      strokeColor: AppColors.yellowDark,
-      strokeWidth: 2,
+      fillColor: AppColors.yellow.withValues(alpha: 0.1),
+      strokeColor: AppColors.yellowDark.withValues(alpha: 0.4),
+      strokeWidth: 1,
     ),
   };
 
-  /// Wide radius → zoomed out. Each doubling of the radius is one zoom level.
-  double get _zoom => (14 - math.log(widget.radiusKm) / math.ln2).clamp(9, 15);
 
   @override
   Widget build(BuildContext context) => SizedBox(
     height: widget.height,
     width: double.infinity,
-    child: KwMap(
-      center: widget.origin,
-      zoom: _zoom,
+    child: GoogleMap(
+      initialCameraPosition: CameraPosition(
+        target: widget.origin.toLatLng(),
+        zoom: 18.0,
+      ),
       markers: _markers,
       circles: _circles,
+      padding: widget.padding,
+      myLocationEnabled: true,
+      myLocationButtonEnabled: false,
+      style: MapStyles.silver,
+      cameraTargetBounds: CameraTargetBounds(_indiaBounds),
+      minMaxZoomPreference: const MinMaxZoomPreference(0, 21),
       onMapCreated: (controller) {
         _controller = controller;
-        _fitRadius();
+        // Small delay to ensure the map is ready for camera animation
+        Future.delayed(const Duration(milliseconds: 300), _fitRadius);
       },
-      fallback: MapCanvas(
-        labours: widget.labours,
-        selectedId: widget.selectedId,
-        height: widget.height,
-        onPinTap: widget.onPinTap,
-      ),
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      compassEnabled: false,
     ),
   );
 }

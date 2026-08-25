@@ -1,4 +1,6 @@
+import 'dart:developer' as dev;
 import 'dart:typed_data';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../api/api_client.dart';
 import '../api/api_config.dart';
@@ -95,6 +97,9 @@ class ApiRepository implements KaamWalaRepository {
         if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
       },
     );
+
+    dev.log('API RESPONSE: $data', name: 'SEARCH_DEBUG');
+
     // The endpoint paginates, so rows sit under `data.data`.
     return rowsOf(data).map(Labour.fromJson).toList();
   }
@@ -102,6 +107,12 @@ class ApiRepository implements KaamWalaRepository {
   @override
   Future<Labour> labourDetail(int id) async =>
       Labour.fromJson(_obj(await _api.get('thekedar/labour/$id')));
+
+  @override
+  Future<List<Labour>> allLaboursForSearch() async {
+    final data = await _api.get('thekedar/all-labours-for-search');
+    return rowsOf(data).map(Labour.fromJson).toList();
+  }
 
   @override
   Future<List<Skill>> skills() async =>
@@ -167,6 +178,93 @@ class ApiRepository implements KaamWalaRepository {
       TrackingUpdate.fromJson(
         _obj(await _api.get('thekedar/bookings/$bookingId/track')),
       );
+
+  @override
+  Future<List<LatLng>> getRoutePolyline(
+    LatLng origin,
+    LatLng destination,
+  ) async {
+    // Migration to Google Routes API (New V2)
+    final response = await _api.postRaw(
+      'https://routes.googleapis.com/directions/v2:computeRoutes',
+      headers: {
+        'X-Goog-Api-Key': ApiConfig.mapsApiKey,
+        'X-Goog-FieldMask': 'routes.polyline',
+      },
+      body: {
+        'origin': {
+          'location': {
+            'latLng': {
+              'latitude': origin.latitude,
+              'longitude': origin.longitude,
+            }
+          }
+        },
+        'destination': {
+          'location': {
+            'latLng': {
+              'latitude': destination.latitude,
+              'longitude': destination.longitude,
+            }
+          }
+        },
+        'travelMode': 'DRIVE',
+      },
+    );
+
+    final data = _obj(response);
+    dev.log('ROUTES API FULL RESPONSE: $data', name: 'TRACKING_DEBUG');
+
+    final routes = data['routes'] as List?;
+
+    if (routes == null || routes.isEmpty) {
+      dev.log('ROUTES API ERROR: ${data['error']?['message'] ?? 'No routes found'}',
+          name: 'TRACKING_DEBUG');
+      return [];
+    }
+
+    final encodedPolyline =
+        (routes.first as Map)['polyline']?['encodedPolyline'] as String?;
+
+    if (encodedPolyline == null) return [];
+
+    final decoded = _decodePolyline(encodedPolyline);
+    dev.log('ROUTES API: Fetched ${decoded.length} points',
+        name: 'TRACKING_DEBUG');
+    return decoded;
+  }
+
+  /// Decodes an encoded polyline string into a list of LatLng points.
+  /// (Algorithm from Google Maps SDK)
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> poly = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      poly.add(LatLng(lat / 1e5, lng / 1e5));
+    }
+    return poly;
+  }
 
   @override
   Future<void> reviewBooking({

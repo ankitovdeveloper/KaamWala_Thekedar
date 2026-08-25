@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/i18n/app_strings.dart';
 import '../api/api_client.dart';
@@ -169,6 +170,9 @@ class GeoPoint {
   String toString() =>
       'GeoPoint(${lat.toStringAsFixed(5)}, '
       '${lng.toStringAsFixed(5)})';
+
+  /// Bridges the SDK-free [GeoPoint] the data layer speaks to the plugin's type.
+  LatLng toLatLng() => LatLng(lat, lng);
 }
 
 /// Turns a full name into the two-letter monogram every avatar uses.
@@ -474,7 +478,10 @@ class Labour {
       ? s.metresAway((distanceKm! * 1000).round())
       : s.kmAway(distanceKm!.toStringAsFixed(1));
 
-  Labour copyWith({bool? isSaved}) => Labour(
+  Labour copyWith({
+    bool? isSaved,
+    double? distanceKm,
+  }) => Labour(
     id: id,
     name: name,
     dailyRate: dailyRate,
@@ -486,7 +493,7 @@ class Labour {
     experienceYears: experienceYears,
     city: city,
     address: address,
-    distanceKm: distanceKm,
+    distanceKm: distanceKm ?? this.distanceKm,
     bio: bio,
     timing: timing,
     reviews: reviews,

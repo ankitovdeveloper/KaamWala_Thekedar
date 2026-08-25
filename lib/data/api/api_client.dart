@@ -80,6 +80,53 @@ class ApiClient {
   Future<dynamic> delete(String path) =>
       _send(() => _client.delete(_uri(path), headers: _headers));
 
+  /// Hits an absolute URL without the [baseUrl] prefix or Sanctum envelope
+  /// unwrapping — used for third-party APIs like Google Maps.
+  Future<dynamic> getRaw(
+    String url, {
+    Map<String, dynamic>? query,
+  }) async {
+    final base = Uri.parse(url);
+    final uri = query == null || query.isEmpty
+        ? base
+        : base.replace(
+            queryParameters: {
+              for (final entry in query.entries)
+                if (entry.value != null) entry.key: '${entry.value}',
+            },
+          );
+
+    try {
+      final response = await _client.get(uri).timeout(ApiConfig.receiveTimeout);
+      return jsonDecode(response.body);
+    } catch (e) {
+      return const {};
+    }
+  }
+
+  /// Hits an absolute URL with POST, without the [baseUrl] prefix.
+  Future<dynamic> postRaw(
+    String url, {
+    Map<String, String>? headers,
+    Map<String, dynamic>? body,
+  }) async {
+    try {
+      final response = await _client
+          .post(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              ...?headers,
+            },
+            body: jsonEncode(body ?? const {}),
+          )
+          .timeout(ApiConfig.receiveTimeout);
+      return jsonDecode(response.body);
+    } catch (e) {
+      return const {};
+    }
+  }
+
   /// Uploads one file as `multipart/form-data`, for the endpoints Laravel backs
   /// with a `file`/`image` validation rule.
   ///

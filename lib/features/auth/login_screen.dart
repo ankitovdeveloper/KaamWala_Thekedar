@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import '../../core/animations/effects.dart';
 import '../../core/animations/entrance.dart';
 import '../../core/animations/pressable.dart';
@@ -92,7 +91,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // A short viewport (landscape phone) drops the tagline and tightens gaps.
     final compactHeight = context.isShort;
     final s = context.s;
 

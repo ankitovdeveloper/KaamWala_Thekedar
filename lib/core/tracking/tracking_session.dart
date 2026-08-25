@@ -1,6 +1,6 @@
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../data/api/api_config.dart';
 import '../../data/models/models.dart';
@@ -33,6 +33,7 @@ class TrackingSession extends ChangeNotifier {
 
   TrackingUpdate? _latest;
   TrackingUpdate? _previous;
+  List<LatLng> _routePoints = [];
   Object? _error;
 
   /// Most recent sample from the server.
@@ -40,6 +41,9 @@ class TrackingSession extends ChangeNotifier {
 
   /// The sample before it — the start point for the marker's tween.
   TrackingUpdate? get previous => _previous;
+
+  /// The road-based polyline points between worker and destination.
+  List<LatLng> get routePoints => _routePoints;
 
   Object? get error => _error;
 
@@ -78,6 +82,28 @@ class TrackingSession extends ChangeNotifier {
       _previous = _latest;
       _latest = update;
       _error = null;
+
+      // Fetch the road route if the worker is on the way.
+      if (update.stage == JobStage.onTheWay &&
+          update.position != null &&
+          update.destination != null) {
+        
+        final posChanged = _previous?.position?.lat != update.position?.lat ||
+            _previous?.position?.lng != update.position?.lng;
+        final destChanged = _previous?.destination?.lat != update.destination?.lat ||
+            _previous?.destination?.lng != update.destination?.lng;
+
+        // Force fetch if route is empty OR if either position or destination has changed
+        if (_routePoints.isEmpty || posChanged || destChanged) {
+          _routePoints = await repository.getRoutePolyline(
+            update.position!.toLatLng(),
+            update.destination!.toLatLng(),
+          );
+        }
+      } else {
+        _routePoints = [];
+      }
+
       if (update.stage == JobStage.completed) stop();
     } on Object catch (e) {
       if (_disposed) return;

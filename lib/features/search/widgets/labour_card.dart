@@ -46,17 +46,6 @@ class LabourCard extends StatelessWidget {
               _avatar(),
               Gap.hXl,
               Expanded(child: _info(context)),
-              if (!stacked) ...[
-                Gap.hLg,
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: KwChipButton(
-                    label: context.s.connect,
-                    filled: true,
-                    onPressed: onConnect,
-                  ),
-                ),
-              ],
             ],
           );
 
@@ -69,7 +58,7 @@ class LabourCard extends StatelessWidget {
               head,
               Gap.vXl,
               KwButton(
-                label: context.s.connect,
+                label: context.s.confirmBooking,
                 size: KwButtonSize.small,
                 onPressed: onConnect,
               ),
@@ -96,15 +85,47 @@ class LabourCard extends StatelessWidget {
   }
 
   Widget _info(BuildContext context) {
+    final s = context.s;
+    final session = context.session;
+    final user = session.user;
+    
+    String? distanceLabel;
+    if (user?.latitude != null && user?.longitude != null && 
+        labour.latitude != null && labour.longitude != null) {
+      final origin = GeoPoint(user!.latitude!, user.longitude!);
+      final target = GeoPoint(labour.latitude!, labour.longitude!);
+      final km = origin.distanceKmTo(target);
+      
+      distanceLabel = km < 1 
+        ? s.metresAway((km * 1000).round()) 
+        : s.kmAway(km.toStringAsFixed(1));
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          labour.name,
-          style: AppType.bodyStrong.copyWith(fontSize: 15),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                labour.name,
+                style: AppType.bodyStrong.copyWith(fontSize: 15),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (distanceLabel != null) ...[
+              Gap.hSm,
+              Text(
+                distanceLabel,
+                style: AppType.micro.copyWith(
+                  color: AppColors.yellowDark,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 3),
         // Stars are fixed-width icons, so the rating text is what gives way.

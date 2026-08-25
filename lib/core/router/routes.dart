@@ -5,6 +5,7 @@ import '../../features/auth/login_screen.dart';
 import '../../features/auth/otp_screen.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/labour_detail/labour_detail_screen.dart';
+import '../../features/search/labours_map_screen.dart';
 import '../../features/shell/home_shell.dart';
 import '../../features/tracking/tracking_screen.dart';
 import '../theme/app_theme.dart';
@@ -16,6 +17,7 @@ abstract final class Routes {
   static const login = '/login';
   static const otp = '/otp';
   static const home = '/home';
+  static const laboursMap = '/labours-map';
   static const labourDetail = '/labour';
   static const tracking = '/track';
 
@@ -28,6 +30,7 @@ abstract final class Routes {
           settings,
         ),
         home => _fade(const HomeShell(), settings),
+        laboursMap => _fade(const LaboursMapScreen(), settings),
         labourDetail => _detail(switch (settings.arguments) {
           // The list already has enough for the hero flight, so pass it
           // through as a preview while the full record loads.

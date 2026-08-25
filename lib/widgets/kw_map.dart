@@ -28,10 +28,12 @@ class KwMap extends StatefulWidget {
     this.onCameraMove,
     this.interactive = true,
     this.padding = EdgeInsets.zero,
+    this.style,
   });
 
   final GeoPoint center;
   final double zoom;
+  final String? style;
 
   /// Shown when there is no API key, while the web SDK loads, and if that load
   /// fails — the surrounding screen never has to handle a missing map.
@@ -84,7 +86,12 @@ class _KwMapState extends State<KwMap> {
     markers: widget.markers,
     circles: widget.circles,
     polylines: widget.polylines,
-    onMapCreated: widget.onMapCreated,
+    onMapCreated: (controller) {
+      if (widget.style != null) {
+        controller.setMapStyle(widget.style);
+      }
+      widget.onMapCreated?.call(controller);
+    },
     onCameraIdle: widget.onCameraIdle,
     onCameraMove: widget.onCameraMove,
     padding: widget.padding,
@@ -138,10 +145,6 @@ class _LoadFailed extends StatelessWidget {
 }
 
 /// Bridges the SDK-free [GeoPoint] the data layer speaks to the plugin's type.
-extension GeoPointMaps on GeoPoint {
-  LatLng toLatLng() => LatLng(lat, lng);
-}
-
 extension LatLngGeo on LatLng {
   GeoPoint toGeoPoint() => GeoPoint(latitude, longitude);
 }
