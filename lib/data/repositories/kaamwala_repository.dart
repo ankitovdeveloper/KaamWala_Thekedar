@@ -81,6 +81,31 @@ abstract interface class KaamWalaRepository {
   /// position. Callers poll this; see `TrackingSession`.
   Future<TrackingUpdate> trackBooking(int bookingId);
 
+  /// `GET /thekedar/bookings/{id}/arrival` — what the confirm sheet needs before
+  /// it opens: whether a code is still owed, whether GPS has seen the worker
+  /// arrive, and whether wrong guesses have locked the entry.
+  Future<ArrivalState> arrivalState(int bookingId);
+
+  /// `POST /thekedar/bookings/{id}/arrival` — mark the worker arrived by typing
+  /// the four digits they read out. This is what moves the job to Working.
+  ///
+  /// Throws [ApiException] on a wrong or locked code, with a message meant to be
+  /// shown as it is.
+  Future<ArrivalState> confirmArrival(int bookingId, String code);
+
+  /// `GET /thekedar/bookings/end-reasons` — the chips the "stop this kaam"
+  /// sheet renders.
+  Future<List<EndReason>> endReasons();
+
+  /// `POST /thekedar/bookings/{id}/terminate` — stop a job part-way, with a
+  /// reason the worker gets to read. [note] is required by the backend only for
+  /// the `other` code.
+  Future<JobTermination?> terminateJob(
+    int bookingId, {
+    required String reasonCode,
+    String note,
+  });
+
   /// Hits Google Directions API to get the road path between two points.
   Future<List<LatLng>> getRoutePolyline(LatLng origin, LatLng destination);
 

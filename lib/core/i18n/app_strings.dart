@@ -314,6 +314,44 @@ class AppStrings {
   String minutesAway(int minutes) => '$minutes min door';
   String get trackingStalled =>
       'Location update nahi ho pa raha — dobara koshish jaari hai';
+  String get locationStale =>
+      'Location purani hai — kaam wale ka phone report nahi kar raha';
+  String get stageAuto => 'GPS se apne aap update hua';
+  String arrivedAt(String time) => '$time par pahunche';
+
+  // ── Arrival handshake (mark arrived + 4-digit code) ──────────────────────
+  String get markArrived => 'Arrived mark karein';
+  String get arrivalSheetTitle => 'Kaam wala pahunch gaya?';
+  String get arrivalSheetBody =>
+      'Kaam wale se unka 4 digit code poochein aur yahan daalein. Isi se kaam shuru hoga.';
+  String get arrivalCodeHint => 'Kaam wale ka 4 digit code';
+  String get arrivalConfirm => 'Confirm karein';
+  String get arrivalGpsHere => 'GPS ke hisaab se wo site par hain';
+  String get arrivalGpsNotHere =>
+      'GPS ne unhe site par nahi dekha — code phir bhi chalega';
+  String get arrivalNeedsCode => 'Pahunchne par code daal kar kaam shuru karein';
+  String get arrivalDone => 'Kaam shuru ho gaya';
+  String arrivalAttemptsLeft(int left) => '$left koshish bachi hai';
+  String get arrivalLocked => 'Bahut galat code — thodi der baad koshish karein';
+  String get arrivalCodeIncomplete => 'Poore 4 digit daalein';
+
+  // ── Stopping a kaam part-way ──────────────────────────────────────────────
+  String get endJob => 'Kaam band karein';
+  String get endJobTitle => 'Ye kaam band karna hai?';
+  String get endJobBody =>
+      'Wajah chuniye. Kaam wale ko bata diya jayega, aur ye wapas nahi hoga.';
+  String get endJobNoteHint => 'Wajah likhein';
+  String get endJobPickReason => 'Pehle wajah chuniye';
+  String get endJobConfirm => 'Haan, kaam band karein';
+  String get endJobCancel => 'Nahi, jaari rakhein';
+  String get endJobFailed => 'Kaam band nahi ho paya';
+  String get endedByYou => 'Aapne ye kaam band kiya';
+  String get endedByLabour => 'Kaam wale ne kaam band kar diya';
+  String get endedReason => 'Wajah';
+  String get endedWorked => 'Band hone tak kaam';
+  String get endedPayNote =>
+      'Itne time ka paisa kaam wale se seedhe tay karein.';
+
   String get requestSent => 'Request bhej di gayi';
   String awaitingAccept(String name) =>
       '$name ke accept karte hi live location yahan dikhne lagegi.';
@@ -883,6 +921,66 @@ class _Hindi extends AppStrings {
   @override
   String get trackingStalled =>
       'लोकेशन अपडेट नहीं हो पा रही — कोशिश जारी है';
+  @override
+  String get locationStale =>
+      'लोकेशन पुरानी है — काम वाले का फ़ोन रिपोर्ट नहीं कर रहा';
+  @override
+  String get stageAuto => 'GPS से अपने आप अपडेट हुआ';
+  @override
+  String arrivedAt(String time) => '$time पर पहुँचे';
+  @override
+  String get markArrived => 'पहुँचना मार्क करें';
+  @override
+  String get arrivalSheetTitle => 'काम वाला पहुँच गया?';
+  @override
+  String get arrivalSheetBody =>
+      'काम वाले से उनका 4 अंक का कोड पूछें और यहाँ डालें। इसी से काम शुरू होगा।';
+  @override
+  String get arrivalCodeHint => 'काम वाले का 4 अंक का कोड';
+  @override
+  String get arrivalConfirm => 'कन्फर्म करें';
+  @override
+  String get arrivalGpsHere => 'GPS के हिसाब से वो साइट पर हैं';
+  @override
+  String get arrivalGpsNotHere =>
+      'GPS ने उन्हें साइट पर नहीं देखा — कोड फिर भी चलेगा';
+  @override
+  String get arrivalNeedsCode => 'पहुँचने पर कोड डालकर काम शुरू करें';
+  @override
+  String get arrivalDone => 'काम शुरू हो गया';
+  @override
+  String arrivalAttemptsLeft(int left) => '$left कोशिश बची है';
+  @override
+  String get arrivalLocked => 'बहुत ग़लत कोड — थोड़ी देर बाद कोशिश करें';
+  @override
+  String get arrivalCodeIncomplete => 'पूरे 4 अंक डालें';
+  @override
+  String get endJob => 'काम बंद करें';
+  @override
+  String get endJobTitle => 'ये काम बंद करना है?';
+  @override
+  String get endJobBody =>
+      'वजह चुनें। काम वाले को बता दिया जाएगा, और ये वापस नहीं होगा।';
+  @override
+  String get endJobNoteHint => 'वजह लिखें';
+  @override
+  String get endJobPickReason => 'पहले वजह चुनें';
+  @override
+  String get endJobConfirm => 'हाँ, काम बंद करें';
+  @override
+  String get endJobCancel => 'नहीं, जारी रखें';
+  @override
+  String get endJobFailed => 'काम बंद नहीं हो पाया';
+  @override
+  String get endedByYou => 'आपने ये काम बंद किया';
+  @override
+  String get endedByLabour => 'काम वाले ने काम बंद कर दिया';
+  @override
+  String get endedReason => 'वजह';
+  @override
+  String get endedWorked => 'बंद होने तक काम';
+  @override
+  String get endedPayNote => 'इतने समय का पैसा काम वाले से सीधे तय करें।';
   @override
   String get requestSent => 'रिक्वेस्ट भेज दी गई';
   @override
@@ -1504,6 +1602,66 @@ class _English extends AppStrings {
   @override
   String get trackingStalled =>
       'Location is not updating — still retrying';
+  @override
+  String get locationStale =>
+      'This position is old — the worker\'s phone is not reporting';
+  @override
+  String get stageAuto => 'Updated automatically by GPS';
+  @override
+  String arrivedAt(String time) => 'Reached at $time';
+  @override
+  String get markArrived => 'Mark arrived';
+  @override
+  String get arrivalSheetTitle => 'Has the worker reached?';
+  @override
+  String get arrivalSheetBody =>
+      'Ask the worker for their 4-digit code and enter it here. That is what starts the work.';
+  @override
+  String get arrivalCodeHint => 'Worker\'s 4-digit code';
+  @override
+  String get arrivalConfirm => 'Confirm';
+  @override
+  String get arrivalGpsHere => 'GPS puts them at the site';
+  @override
+  String get arrivalGpsNotHere =>
+      'GPS has not seen them at the site — the code still works';
+  @override
+  String get arrivalNeedsCode => 'Enter the code on arrival to start the work';
+  @override
+  String get arrivalDone => 'The work has started';
+  @override
+  String arrivalAttemptsLeft(int left) => '$left tries left';
+  @override
+  String get arrivalLocked => 'Too many wrong codes — try again in a while';
+  @override
+  String get arrivalCodeIncomplete => 'Enter all 4 digits';
+  @override
+  String get endJob => 'Stop this work';
+  @override
+  String get endJobTitle => 'Stop this work?';
+  @override
+  String get endJobBody =>
+      'Pick a reason. The worker will be told, and this cannot be undone.';
+  @override
+  String get endJobNoteHint => 'Write the reason';
+  @override
+  String get endJobPickReason => 'Pick a reason first';
+  @override
+  String get endJobConfirm => 'Yes, stop the work';
+  @override
+  String get endJobCancel => 'No, carry on';
+  @override
+  String get endJobFailed => 'Could not stop the work';
+  @override
+  String get endedByYou => 'You stopped this work';
+  @override
+  String get endedByLabour => 'The worker stopped this work';
+  @override
+  String get endedReason => 'Reason';
+  @override
+  String get endedWorked => 'Worked before stopping';
+  @override
+  String get endedPayNote => 'Settle the payment for this time with the worker directly.';
   @override
   String get requestSent => 'Request sent';
   @override

@@ -676,6 +676,13 @@ class TrackingUpdate {
     this.etaMinutes,
     this.distanceKm,
     this.accepted = true,
+    this.isLive = true,
+    this.stageSource,
+    this.arrivedAt,
+    this.needsArrivalCode = false,
+    this.arrivalConfirmedAt,
+    this.canTerminate = false,
+    this.termination,
   });
 
   /// False while the request is still with the worker.
@@ -693,6 +700,39 @@ class TrackingUpdate {
   final int? etaMinutes;
   final double? distanceKm;
 
+  /// False when the backend is serving the worker's registered address because
+  /// their phone has stopped reporting. The marker is then a last known spot,
+  /// not a live one, and saying so beats a dot that looks parked.
+  final bool isLive;
+
+  /// 'auto' when the stage was moved by the worker's GPS crossing a threshold,
+  /// 'manual' when they tapped it, null when nothing has moved it yet.
+  final String? stageSource;
+
+  /// When the worker entered the site geofence, if they have.
+  final DateTime? arrivedAt;
+
+  /// True while the work is waiting on this Thekedar: mark the arrival and type
+  /// the worker's four-digit code. Nothing else moves the job to Working.
+  final bool needsArrivalCode;
+
+  /// When that handshake happened.
+  final DateTime? arrivalConfirmedAt;
+
+  /// Whether the "stop this kaam" button belongs on the card.
+  final bool canTerminate;
+
+  /// Set once either side stopped the job part-way. Non-null is the signal to
+  /// stop polling and show what happened — including when the *worker* ended it,
+  /// which is otherwise just a dot that went still.
+  final JobTermination? termination;
+
+  bool get wasTerminated => termination != null;
+
+  /// True when the timeline above was advanced by the tracker rather than by the
+  /// worker — worth showing, because it means nobody had to remember to tap.
+  bool get stageWasAutomatic => stageSource == 'auto';
+
   factory TrackingUpdate.fromJson(Map<String, dynamic> json) => TrackingUpdate(
     stage: JobStage.parse(json.strOrNull('job_stage')),
     position: GeoPoint.fromJson(json.mapOrNull('position')),
@@ -700,6 +740,18 @@ class TrackingUpdate {
     etaMinutes: json['eta_minutes'] == null ? null : json.intVal('eta_minutes'),
     distanceKm: json['distance_km'] == null ? null : json.dbl('distance_km'),
     accepted: json.strOrNull('status') == 'accepted',
+    // Absent on a pending booking (and on an older backend); assumed live so a
+    // missing flag never puts a false warning on the card.
+    isLive: json['is_live'] == null || json.flag('is_live'),
+    stageSource: json.strOrNull('stage_source'),
+    arrivedAt: json.date('arrived_at'),
+    needsArrivalCode: json.flag('needs_arrival_code'),
+    arrivalConfirmedAt: json.date('arrival_confirmed_at'),
+    canTerminate: json.flag('can_terminate'),
+    termination: switch (json.mapOrNull('termination')) {
+      final t? => JobTermination.fromJson(t),
+      _ => null,
+    },
   );
 
   /// "8 min door" / "Kaam shuru ho gaya" — the tracking card's headline.
@@ -711,6 +763,174 @@ class TrackingUpdate {
     if (eta == null) return s.onTheWay;
     return eta <= 1 ? s.almostThere : s.minutesAway(eta);
   }
+}
+
+/// One chip in the "stop this kaam" sheet
+/// (`GET /thekedar/bookings/end-reasons`).
+///
+/// Served by the backend rather than hard-coded so a reworded reason needs no
+/// release, and so the list cannot drift from what the API will accept.
+@immutable
+class EndReason {
+  const EndReason({
+    required this.code,
+    required this.label,
+    this.needsNote = false,
+  });
+
+  final String code;
+  final String label;
+
+  /// True for `other`: picking it and typing nothing would record nothing, so
+  /// the sheet has to demand the note.
+  final bool needsNote;
+
+  factory EndReason.fromJson(Map<String, dynamic> json) => EndReason(
+    code: json.str('code'),
+    label: json.str('label'),
+    needsNote: json.flag('needs_note'),
+  );
+}
+
+/// Who stopped a job part-way.
+enum EndedBy {
+  labour,
+  thekedar,
+  unknown;
+
+  static EndedBy parse(String? raw) => switch (raw) {
+    'labour' => labour,
+    'thekedar' => thekedar,
+    _ => unknown,
+  };
+}
+
+/// Why a job stopped part-way — shown to both sides.
+///
+/// A Thekedar whose worker walked off needs the worker's reason as much as the
+/// worker needs theirs, so this rides on the tracking payload too.
+@immutable
+class JobTermination {
+  const JobTermination({
+    this.by = EndedBy.unknown,
+    this.byLabel = '',
+    this.reasonCode = '',
+    this.reason = '',
+    this.reasonLabel = '',
+    this.at,
+    this.stageWhenEnded = JobStage.pending,
+    this.workedMinutes,
+  });
+
+  final EndedBy by;
+
+  /// 'Kaam wale' / 'Thekedar' — the actor, phrased from nobody's point of view.
+  /// Each screen puts "aapne" or "unhone" around it itself.
+  final String byLabel;
+
+  final String reasonCode;
+
+  /// What is actually shown: the typed note when there was one, else the canned
+  /// label for the code.
+  final String reason;
+  final String reasonLabel;
+
+  final DateTime? at;
+
+  /// Where the job had got to when it was stopped — the fact that decides
+  /// whether anything is owed.
+  final JobStage stageWhenEnded;
+
+  /// Minutes actually worked before it stopped; null when work never began.
+  final int? workedMinutes;
+
+  bool get byLabour => by == EndedBy.labour;
+  bool get byThekedar => by == EndedBy.thekedar;
+
+  /// '2 ghante 15 min' — empty when nothing was worked.
+  String get workedLabel {
+    final mins = workedMinutes ?? 0;
+    if (mins <= 0) return '';
+    final h = mins ~/ 60;
+    final m = mins % 60;
+    if (h == 0) return '$m min';
+    if (m == 0) return '$h ghante';
+    return '$h ghante $m min';
+  }
+
+  factory JobTermination.fromJson(Map<String, dynamic> json) => JobTermination(
+    by: EndedBy.parse(json.strOrNull('by')),
+    byLabel: json.str('by_label'),
+    reasonCode: json.str('reason_code'),
+    reason: json.str('reason'),
+    reasonLabel: json.str('reason_label'),
+    at: json.date('at'),
+    stageWhenEnded: JobStage.parse(json.strOrNull('stage_when_ended')),
+    workedMinutes: json['worked_minutes'] == null
+        ? null
+        : json.intVal('worked_minutes'),
+  );
+}
+
+/// `GET|POST /thekedar/bookings/{id}/arrival` — the arrival handshake.
+///
+/// The worker carries a four-digit code for the booking. When they turn up, the
+/// Thekedar types it here and that is what starts the kaam. Neither side can
+/// declare the work started alone: GPS can put a phone at an address without the
+/// worker being there, and a plain "Arrived" button could be tapped from
+/// anywhere. The code is the proof that the two of them are standing together.
+///
+/// The code itself is never in this payload — the Thekedar has to be told it.
+@immutable
+class ArrivalState {
+  const ArrivalState({
+    required this.bookingId,
+    required this.stage,
+    this.needsCode = false,
+    this.gpsArrived = false,
+    this.locked = false,
+    this.lockedForMinutes = 0,
+    this.attemptsLeft = 0,
+    this.arrivedAt,
+    this.confirmedAt,
+    this.startedAt,
+  });
+
+  final int bookingId;
+  final JobStage stage;
+
+  /// Whether there is still a code to type on this booking.
+  final bool needsCode;
+
+  /// Whether GPS has already put the worker on site. Advisory only — the code
+  /// works either way, because GPS fails and the kaam cannot wait for it.
+  final bool gpsArrived;
+
+  /// True once wrong guesses have shut the entry for a while.
+  final bool locked;
+  final int lockedForMinutes;
+
+  /// Guesses left before that happens.
+  final int attemptsLeft;
+
+  final DateTime? arrivedAt;
+  final DateTime? confirmedAt;
+  final DateTime? startedAt;
+
+  bool get confirmed => confirmedAt != null || stage == JobStage.working;
+
+  factory ArrivalState.fromJson(Map<String, dynamic> json) => ArrivalState(
+    bookingId: json.intVal('booking_id'),
+    stage: JobStage.parse(json.strOrNull('job_stage')),
+    needsCode: json.flag('needs_code'),
+    gpsArrived: json.flag('gps_arrived'),
+    locked: json.flag('locked'),
+    lockedForMinutes: json.intVal('locked_for_minutes'),
+    attemptsLeft: json.intVal('attempts_left'),
+    arrivedAt: json.date('arrived_at'),
+    confirmedAt: json.date('arrival_confirmed_at'),
+    startedAt: json.date('started_at'),
+  );
 }
 
 /// `Address` — the labelled locations on the Profile screen.

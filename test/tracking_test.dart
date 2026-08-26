@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kaamwala_thekedar/core/i18n/app_strings.dart';
@@ -24,6 +25,11 @@ class _ScriptedRepository extends MockRepository {
     calls++;
     return update;
   }
+
+  /// Starts the parent's simulation for [bookingId] without consuming a
+  /// scripted sample. The arrival handshake runs off that simulation, and the
+  /// override above means it would otherwise never be created.
+  Future<void> seedSimulation(int bookingId) => super.trackBooking(bookingId);
 }
 
 /// Fails every poll — used to check the screen's error path.
@@ -48,7 +54,65 @@ TrackingUpdate _enRoute(GeoPoint at, int eta) => TrackingUpdate(
   distanceKm: at.distanceKmTo(_site),
 );
 
+/// At the gate: GPS has seen them arrive, but the kaam has not started — that
+/// waits on the Thekedar typing the worker's code.
+TrackingUpdate _atGate() => TrackingUpdate(
+  stage: JobStage.onTheWay,
+  position: _site,
+  destination: _site,
+  etaMinutes: 0,
+  distanceKm: 0,
+  arrivedAt: DateTime(2026, 8, 26, 10, 47),
+  needsArrivalCode: true,
+  canTerminate: true,
+  stageSource: 'auto',
+);
+
+/// After the handshake.
+TrackingUpdate _working() => TrackingUpdate(
+  stage: JobStage.working,
+  position: _site,
+  destination: _site,
+  arrivedAt: DateTime(2026, 8, 26, 10, 47),
+  arrivalConfirmedAt: DateTime(2026, 8, 26, 10, 49),
+  needsArrivalCode: false,
+  stageSource: 'code',
+);
+
+/// The worker walked off. The Thekedar's only explanation for a dot that stopped.
+TrackingUpdate _endedByLabour() => TrackingUpdate(
+  stage: JobStage.working,
+  destination: _site,
+  arrivedAt: DateTime(2026, 8, 26, 10, 47),
+  needsArrivalCode: false,
+  canTerminate: false,
+  isLive: false,
+  termination: JobTermination(
+    by: EndedBy.labour,
+    byLabel: 'Kaam wale',
+    reasonCode: 'emergency',
+    reason: 'Ghar par emergency',
+    reasonLabel: 'Ghar par emergency hai',
+    at: DateTime(2026, 8, 26, 12, 30),
+    stageWhenEnded: JobStage.working,
+    workedMinutes: 135,
+  ),
+);
+
 Booking _booking() => Mock.bookings().firstWhere((b) => b.id == 101);
+
+/// Taps the end-job sheet's confirm button, scrolling it into view first.
+///
+/// Needed, not belt-and-braces: with the note field open the sheet is taller than
+/// the test surface, and `tap()` on an off-screen widget only warns — the tap
+/// silently does nothing and the assertion afterwards fails for the wrong reason.
+Future<void> _tapConfirm(WidgetTester tester) async {
+  final confirm = find.text('Haan, kaam band karein');
+  await tester.ensureVisible(confirm);
+  await tester.pumpAndSettle();
+  await tester.tap(confirm);
+  await tester.pumpAndSettle();
+}
 
 void main() {
   group('GeoPoint', () {
@@ -170,6 +234,29 @@ void main() {
       session.dispose();
     });
 
+    test('polling stops once somebody stopped the job', () async {
+      final repo = _ScriptedRepository([_endedByLabour()]);
+
+      final session = TrackingSession(
+        repository: repo,
+        bookingId: 101,
+        interval: const Duration(milliseconds: 10),
+      )..start();
+
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      final callsAtStop = repo.calls;
+      expect(session.isFinished, isTrue);
+
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(
+        repo.calls,
+        callsAtStop,
+        reason: 'a stopped job must not keep hitting the server',
+      );
+
+      session.dispose();
+    });
+
     test('a failed poll before any fix is fatal, after one is not', () async {
       final broken = _BrokenRepository();
       final session = TrackingSession(
@@ -280,6 +367,169 @@ void main() {
       expect(find.text('9 min door'), findsOneWidget);
       expect(find.byType(StageTimeline), findsOneWidget);
       expect(find.text('Request bhej di gayi'), findsNothing);
+    });
+
+    testWidgets('offers the arrival handshake while a code is owed', (
+      tester,
+    ) async {
+      final repo = _ScriptedRepository([_atGate()]);
+
+      await tester.pumpWidget(
+        host(TrackingScreen(booking: _booking()), repository: repo),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      // Reaching the site does not start the kaam: the timeline stays on
+      // "on the way" and the Thekedar is asked for the code.
+      expect(find.text('Arrived mark karein'), findsOneWidget);
+      expect(
+        find.textContaining('code daal kar kaam shuru karein'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('drops the handshake once the code has been confirmed', (
+      tester,
+    ) async {
+      final repo = _ScriptedRepository([_working()]);
+
+      await tester.pumpWidget(
+        host(TrackingScreen(booking: _booking()), repository: repo),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Arrived mark karein'), findsNothing);
+      expect(find.text('Kaam shuru ho gaya'), findsWidgets);
+    });
+
+    testWidgets('the code sheet rejects a wrong code and stays open', (
+      tester,
+    ) async {
+      final repo = _ScriptedRepository([_atGate()]);
+      // The sheet posts through the repository, and the mock only has a
+      // simulation for a booking it has been asked to track.
+      await repo.seedSimulation(101);
+
+      await tester.pumpWidget(
+        host(TrackingScreen(booking: _booking()), repository: repo),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Arrived mark karein'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kaam wala pahunch gaya?'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), '0000');
+      await tester.tap(find.text('Confirm karein'));
+      await tester.pumpAndSettle();
+
+      // Still open, showing the server's own wording.
+      expect(find.text('Kaam wala pahunch gaya?'), findsOneWidget);
+      expect(find.textContaining('Code galat hai'), findsOneWidget);
+    });
+
+    testWidgets('the right code starts the work and closes the sheet', (
+      tester,
+    ) async {
+      final repo = _ScriptedRepository([_atGate()]);
+      await repo.seedSimulation(101);
+
+      await tester.pumpWidget(
+        host(TrackingScreen(booking: _booking()), repository: repo),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Arrived mark karein'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), '1234');
+      await tester.tap(find.text('Confirm karein'));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+
+      expect(find.text('Kaam wala pahunch gaya?'), findsNothing);
+    });
+
+    testWidgets('explains a job the worker stopped, and offers no actions', (
+      tester,
+    ) async {
+      final repo = _ScriptedRepository([_endedByLabour()]);
+
+      await tester.pumpWidget(
+        host(TrackingScreen(booking: _booking()), repository: repo),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Kaam wale ne kaam band kar diya'), findsOneWidget);
+      expect(find.text('Ghar par emergency'), findsOneWidget);
+      // 135 minutes of work is owed a conversation about money.
+      expect(find.text('2 ghante 15 min'), findsOneWidget);
+
+      // Nothing left to do from here.
+      expect(find.text('Arrived mark karein'), findsNothing);
+      expect(find.text('Kaam band karein'), findsNothing);
+    });
+
+    testWidgets('the Thekedar can stop the kaam with a reason', (tester) async {
+      final repo = _ScriptedRepository([_atGate()]);
+      await repo.seedSimulation(101);
+
+      await tester.pumpWidget(
+        host(TrackingScreen(booking: _booking()), repository: repo),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Kaam band karein'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ye kaam band karna hai?'), findsOneWidget);
+
+      // Confirming without picking anything must not stop a job by accident.
+      await _tapConfirm(tester);
+      expect(find.text('Pehle wajah chuniye'), findsOneWidget);
+      expect(find.text('Ye kaam band karna hai?'), findsOneWidget);
+
+      await tester.tap(find.text('Kaam theek se nahi ho raha'));
+      await tester.pumpAndSettle();
+      await _tapConfirm(tester);
+
+      expect(find.text('Ye kaam band karna hai?'), findsNothing);
+    });
+
+    testWidgets('picking "other" demands the note before it will submit', (
+      tester,
+    ) async {
+      final repo = _ScriptedRepository([_atGate()]);
+      await repo.seedSimulation(101);
+
+      await tester.pumpWidget(
+        host(TrackingScreen(booking: _booking()), repository: repo),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Kaam band karein'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Koi aur wajah'));
+      await tester.pumpAndSettle();
+
+      await _tapConfirm(tester);
+
+      // Still open: "other" with nothing typed would record nothing at all.
+      expect(find.text('Ye kaam band karna hai?'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'Material aaya hi nahi');
+      await tester.pump();
+      await _tapConfirm(tester);
+
+      expect(find.text('Ye kaam band karna hai?'), findsNothing);
     });
 
     testWidgets('surfaces an error when the first poll fails', (tester) async {

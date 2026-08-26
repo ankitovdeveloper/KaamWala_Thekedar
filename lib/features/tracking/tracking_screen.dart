@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/animations/entrance.dart';
+import '../../core/animations/pressable.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
@@ -9,8 +10,11 @@ import '../../core/tracking/tracking_session.dart';
 import '../../data/models/models.dart';
 import '../../data/session.dart';
 import '../../widgets/kw_async.dart';
+import '../../widgets/kw_button.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
+import 'widgets/arrival_sheet.dart';
+import 'widgets/end_job_sheet.dart';
 import 'widgets/tracking_map.dart';
 import 'widgets/stage_timeline.dart';
 
@@ -187,6 +191,45 @@ class _TrackingScreenState extends State<TrackingScreen> {
               ),
               Gap.v20,
               StageTimeline(stage: update.stage, reached: update.accepted),
+              ..._notes(update),
+              if (update.termination case final ended?) ...[
+                Gap.v20,
+                _EndedNote(ended: ended),
+              ],
+              if (update.needsArrivalCode && update.accepted) ...[
+                Gap.v20,
+                // The one action on this screen. Deliberately available before
+                // GPS says they have arrived: GPS fails, and a worker standing
+                // in front of the Thekedar should not have to wait for a
+                // satellite before the kaam can start.
+                KwButton(
+                  label: s.markArrived,
+                  icon: Icons.how_to_reg_rounded,
+                  variant: update.arrivedAt == null
+                      ? KwButtonVariant.outline
+                      : KwButtonVariant.yellow,
+                  onPressed: () => _confirmArrival(update),
+                ),
+              ],
+              if (update.canTerminate) ...[
+                Gap.vMd,
+                // Quiet and text-only: this is the way out, not somewhere the
+                // card is pushing anybody.
+                Pressable(
+                  onTap: _endJob,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: Gap.lg),
+                    child: Text(
+                      s.endJob,
+                      textAlign: TextAlign.center,
+                      style: AppType.bodyStrong.copyWith(
+                        fontSize: 13,
+                        color: AppColors.danger,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               if (_session.error != null) ...[
                 Gap.vMd,
                 // A failed poll keeps the last position on screen; saying so is
@@ -205,6 +248,155 @@ class _TrackingScreenState extends State<TrackingScreen> {
       ),
     );
   }
+
+  /// Opens the code sheet, and pulls a fresh sample the moment it succeeds so
+  /// the timeline moves to Working without waiting for the next poll tick.
+  Future<void> _confirmArrival(TrackingUpdate update) async {
+    final started = await ArrivalSheet.show(
+      context,
+      repository: context.repo,
+      bookingId: widget.booking.id,
+      workerName: widget.booking.labour.name,
+      gpsArrived: update.arrivedAt != null,
+    );
+
+    if (started == true) await _session.refresh();
+  }
+
+  /// Opens the "stop this kaam" sheet, and pulls one more sample so the card
+  /// switches to the stopped state without waiting for a tick.
+  Future<void> _endJob() async {
+    final ended = await EndJobSheet.show(
+      context,
+      repository: context.repo,
+      bookingId: widget.booking.id,
+      workerName: widget.booking.labour.name,
+    );
+
+    if (ended == true) await _session.refresh();
+  }
+
+  /// The captions under the timeline: how it got where it is, whether the dot on
+  /// the map can be trusted, and what is being waited on.
+  ///
+  /// The worker no longer taps the middle stages — GPS moves "on the way", and
+  /// the code below moves "working" — so the card owes the Thekedar those facts.
+  /// A stale position is the failure mode that matters most: without it, a worker
+  /// whose phone died looks like one who has stopped moving.
+  List<Widget> _notes(TrackingUpdate update) {
+    final s = context.s;
+    final lines = <(String, Color)>[];
+
+    if (update.accepted && !update.isLive) {
+      lines.add((s.locationStale, AppColors.pendingText));
+    }
+
+    final arrivedAt = update.arrivedAt;
+
+    if (update.needsArrivalCode && arrivedAt != null) {
+      // They are here and the kaam is waiting on the Thekedar — the loudest
+      // thing the caption can say, so it takes the success colour, not muted.
+      lines.add((
+        '${s.arrivedAt(_clock(arrivedAt))} · ${s.arrivalNeedsCode}',
+        AppColors.successDark,
+      ));
+    } else if (update.stageWasAutomatic) {
+      lines.add((s.stageAuto, AppColors.muted));
+    } else if (update.arrivalConfirmedAt != null && arrivedAt != null) {
+      lines.add((s.arrivedAt(_clock(arrivedAt)), AppColors.muted));
+    }
+
+    return [
+      for (final (text, color) in lines) ...[
+        Gap.vMd,
+        Text(text, style: AppType.caption.copyWith(fontSize: 12, color: color)),
+      ],
+    ];
+  }
+
+  /// '09:40' — local, 24h, matching the times elsewhere in the app.
+  String _clock(DateTime at) =>
+      '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+}
+
+/// What happened when a job was stopped part-way.
+///
+/// Shown for both directions. When the *worker* ended it, this is the Thekedar's
+/// only explanation for a dot that stopped moving, so the reason is the point of
+/// the block rather than a footnote to it.
+class _EndedNote extends StatelessWidget {
+  const _EndedNote({required this.ended});
+
+  final JobTermination ended;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final reason = ended.reason.isNotEmpty ? ended.reason : ended.reasonLabel;
+    final worked = ended.workedLabel;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Gap.x3l),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: Radii.rSm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.stop_circle_outlined,
+                size: 17,
+                color: AppColors.danger,
+              ),
+              Gap.hSm,
+              Expanded(
+                child: Text(
+                  ended.byThekedar ? s.endedByYou : s.endedByLabour,
+                  style: AppType.bodyStrong.copyWith(fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          if (reason.isNotEmpty) ...[
+            Gap.vMd,
+            _row(s.endedReason, reason),
+          ],
+          if (worked.isNotEmpty) ...[
+            Gap.vSm,
+            _row(s.endedWorked, worked),
+            Gap.vSm,
+            // The app deliberately works out no part-day amount — that is
+            // between the two of them — but it must not pretend the time did
+            // not happen either.
+            Text(
+              s.endedPayNote,
+              style: AppType.caption.copyWith(fontSize: 11.5),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        width: 110,
+        child: Text(label, style: AppType.caption.copyWith(fontSize: 12)),
+      ),
+      Expanded(
+        child: Text(
+          value,
+          style: AppType.bodyStrong.copyWith(fontSize: 12.5),
+        ),
+      ),
+    ],
+  );
 }
 
 /// The gap between sending a request and the worker answering it.

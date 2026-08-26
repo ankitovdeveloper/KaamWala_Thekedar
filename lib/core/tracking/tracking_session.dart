@@ -53,7 +53,9 @@ class TrackingSession extends ChangeNotifier {
   /// last known position on screen rather than blanking the map.
   Object? get fatalError => _latest == null ? _error : null;
 
-  bool get isFinished => _latest?.stage == JobStage.completed;
+  /// Nothing left to follow: the job finished, or somebody stopped it part-way.
+  bool get isFinished =>
+      _latest?.stage == JobStage.completed || _latest?.wasTerminated == true;
 
   /// Fetches once immediately, then every [interval].
   void start() {
@@ -104,7 +106,8 @@ class TrackingSession extends ChangeNotifier {
         _routePoints = [];
       }
 
-      if (update.stage == JobStage.completed) stop();
+      // A job nobody is working any more has no position worth asking for.
+      if (isFinished) stop();
     } on Object catch (e) {
       if (_disposed) return;
       _error = e;

@@ -238,6 +238,81 @@ class MockRepository implements KaamWalaRepository {
   }
 
   @override
+  Future<ArrivalState> arrivalState(int bookingId) {
+    final job = _jobs[bookingId];
+
+    return _delayed(
+      ArrivalState(
+        bookingId: bookingId,
+        stage: job?.stage ?? JobStage.pending,
+        needsCode: job != null && job.hasAccepted && !job.arrivalConfirmed,
+        gpsArrived: job?.gpsArrived ?? false,
+        attemptsLeft: _SimulatedJob.maxAttempts - (job?.wrongAttempts ?? 0),
+        arrivedAt: job?.arrivedAt,
+        confirmedAt: job?.confirmedAt,
+        startedAt: job?.confirmedAt,
+      ),
+    );
+  }
+
+  @override
+  Future<ArrivalState> confirmArrival(int bookingId, String code) {
+    final job = _jobs[bookingId];
+
+    if (job == null) {
+      throw const ApiException('Ye booking nahi mili.', statusCode: 404);
+    }
+
+    if (!job.arrivalConfirmed && !job.tryCode(code)) {
+      final left = _SimulatedJob.maxAttempts - job.wrongAttempts;
+      throw ApiException(
+        left > 0
+            ? 'Code galat hai. $left koshish bachi hai.'
+            : 'Code galat hai. 10 minute ke liye band.',
+        statusCode: 422,
+      );
+    }
+
+    return arrivalState(bookingId);
+  }
+
+  @override
+  Future<List<EndReason>> endReasons() => _delayed(const [
+    EndReason(code: 'worker_absent', label: 'Kaam wala aaya hi nahi'),
+    EndReason(code: 'worker_late', label: 'Bahut late ho gaya'),
+    EndReason(code: 'work_quality', label: 'Kaam theek se nahi ho raha'),
+    EndReason(code: 'not_needed', label: 'Ab is kaam ki zarurat nahi'),
+    EndReason(code: 'rate_dispute', label: 'Rate par baat nahi bani'),
+    EndReason(code: 'misbehaviour', label: 'Vyavhaar theek nahi tha'),
+    EndReason(code: 'other', label: 'Koi aur wajah', needsNote: true),
+  ]);
+
+  @override
+  Future<JobTermination?> terminateJob(
+    int bookingId, {
+    required String reasonCode,
+    String note = '',
+  }) {
+    final job = _jobs[bookingId];
+
+    if (job == null) {
+      throw const ApiException('Ye booking nahi mili.', statusCode: 404);
+    }
+
+    job.terminate(reasonCode, note);
+
+    _bookings = [
+      for (final b in _bookings)
+        if (b.id == bookingId)
+          b.copyWith(status: BookingStatus.cancelled)
+        else
+          b,
+    ];
+
+    return _delayed(job.termination);
+  }
+
+  @override
   Future<List<LatLng>> getRoutePolyline(
     LatLng origin,
     LatLng destination,
@@ -379,9 +454,58 @@ class _SimulatedJob {
     return (travelled.inMilliseconds / _travel.inMilliseconds).clamp(0.0, 1.0);
   }
 
+  /// The code the demo accepts. The real backend mints a random one per booking
+  /// and only ever shows it to the labour; in a Thekedar-only demo there is no
+  /// labour app to read it off, so the mock uses a fixed one.
+  static const demoCode = '1234';
+
+  static const maxAttempts = 5;
+
+  int wrongAttempts = 0;
+  DateTime? confirmedAt;
+
+  /// Set once the demo stops the job part-way.
+  JobTermination? termination;
+
+  void terminate(String reasonCode, String note) {
+    termination = JobTermination(
+      by: EndedBy.thekedar,
+      byLabel: 'Thekedar',
+      reasonCode: reasonCode,
+      reason: note.trim().isEmpty ? reasonCode : note.trim(),
+      reasonLabel: reasonCode,
+      at: DateTime.now(),
+      stageWhenEnded: stage,
+      workedMinutes: confirmedAt == null
+          ? null
+          : DateTime.now().difference(confirmedAt!).inMinutes,
+    );
+  }
+
+  /// GPS has put the worker on the site. Not the same as the work having
+  /// started — that waits for [tryCode].
+  bool get gpsArrived => _progress >= 1;
+
+  DateTime? get arrivedAt =>
+      gpsArrived ? _startedAt.add(acceptAfter + _travel) : null;
+
+  bool get arrivalConfirmed => confirmedAt != null;
+
+  /// Returns false on a wrong code, counting the attempt.
+  bool tryCode(String code) {
+    if (code.trim() != demoCode) {
+      wrongAttempts++;
+      return false;
+    }
+    confirmedAt = DateTime.now();
+    return true;
+  }
+
   JobStage get stage {
     if (!hasAccepted) return JobStage.pending;
-    return _progress >= 1 ? JobStage.working : JobStage.onTheWay;
+    // Reaching the site is NOT what starts the kaam — the Thekedar typing the
+    // worker's code is, which is why arrival parks the job on `onTheWay`.
+    return arrivalConfirmed ? JobStage.working : JobStage.onTheWay;
   }
 
   TrackingUpdate sample() {
@@ -402,9 +526,15 @@ class _SimulatedJob {
       position: position,
       destination: destination,
       distanceKm: position.distanceKmTo(destination),
-      etaMinutes: stage == JobStage.onTheWay
+      etaMinutes: stage == JobStage.onTheWay && !gpsArrived
           ? ((1 - _progress) * _nominalTripMinutes).ceil()
           : 0,
+      arrivedAt: arrivedAt,
+      arrivalConfirmedAt: confirmedAt,
+      needsArrivalCode: termination == null && !arrivalConfirmed,
+      stageSource: arrivalConfirmed ? 'code' : 'auto',
+      canTerminate: termination == null,
+      termination: termination,
     );
   }
 }

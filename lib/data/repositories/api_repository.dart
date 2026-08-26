@@ -180,6 +180,54 @@ class ApiRepository implements KaamWalaRepository {
       );
 
   @override
+  Future<ArrivalState> arrivalState(int bookingId) async =>
+      ArrivalState.fromJson(
+        _obj(await _api.get('thekedar/bookings/$bookingId/arrival')),
+      );
+
+  @override
+  Future<ArrivalState> confirmArrival(int bookingId, String code) async =>
+      ArrivalState.fromJson(
+        _obj(
+          await _api.post(
+            'thekedar/bookings/$bookingId/arrival',
+            body: {'code': code},
+          ),
+        ),
+      );
+
+  @override
+  Future<List<EndReason>> endReasons() async {
+    final data = _obj(await _api.get('thekedar/bookings/end-reasons'));
+    return data
+        .listOfMaps('reasons')
+        .map(EndReason.fromJson)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<JobTermination?> terminateJob(
+    int bookingId, {
+    required String reasonCode,
+    String note = '',
+  }) async {
+    final data = _obj(
+      await _api.post(
+        'thekedar/bookings/$bookingId/terminate',
+        body: {
+          'reason_code': reasonCode,
+          if (note.trim().isNotEmpty) 'reason': note.trim(),
+        },
+      ),
+    );
+
+    return switch (data.mapOrNull('termination')) {
+      final t? => JobTermination.fromJson(t),
+      _ => null,
+    };
+  }
+
+  @override
   Future<List<LatLng>> getRoutePolyline(
     LatLng origin,
     LatLng destination,
