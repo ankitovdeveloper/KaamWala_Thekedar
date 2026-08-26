@@ -197,6 +197,16 @@ class ApiRepository implements KaamWalaRepository {
       );
 
   @override
+  Future<Booking> completeBooking(int bookingId) async => Booking.fromJson(
+    _obj(await _api.post('thekedar/bookings/$bookingId/complete')),
+  );
+
+  @override
+  Future<Booking> markPaymentDone(int bookingId) async => Booking.fromJson(
+    _obj(await _api.post('thekedar/bookings/$bookingId/payment')),
+  );
+
+  @override
   Future<List<EndReason>> endReasons() async {
     final data = _obj(await _api.get('thekedar/bookings/end-reasons'));
     return data

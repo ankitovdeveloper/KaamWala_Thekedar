@@ -358,6 +358,39 @@ class AppStrings {
   String get workerMarker => 'Kaam wala';
   String get siteMarker => 'Kaam ki jagah';
 
+  // The other answer. Until these existed the screen sat on "Accept ka
+  // intezaar" for ever, because a rejection reached the app as a failed poll —
+  // indistinguishable from a dropped connection.
+  String get requestRejected => 'Reject kar di';
+  String get rejectedTitle => 'Kaam wale ne mana kar diya';
+  String rejectedBody(String name) =>
+      '$name ne ye request reject kar di. Dusra kaam wala dekh lein.';
+  String rejectedAt(String time) => '$time par reject hui';
+  String get findAnotherWorker => 'Dusra kaam wala dhundhein';
+
+  // ── Wrapping a job up ─────────────────────────────────────────────────────
+  // Two steps, never one: the kaam finishing and the money moving are separate
+  // facts, usually hours apart, and each one is confirmed by the worker from
+  // their own app before it counts as settled.
+  String get markWorkDone => 'Kaam poora hua';
+  String get markWorkDoneTitle => 'Kaam poora ho gaya?';
+  String markWorkDoneMessage(String name) =>
+      '$name ka kaam poora mark kar denge. Unse confirm karne ko kaha jayega.';
+  String get yesWorkDone => 'Haan, poora hua';
+  String get workDoneMarked => 'Kaam poora mark kar diya';
+  String get markPaymentDone => 'Payment done';
+  String get markPaymentTitle => 'Paisa de diya?';
+  String markPaymentMessage(String name, int amount) =>
+      '₹$amount $name ko de diya — record ho jayega aur unse confirm karne ko kaha jayega.';
+  String get yesPaid => 'Haan, de diya';
+  String get paymentDoneMarked => 'Payment done mark kar diya';
+  String get notYet => 'Abhi nahi';
+  String get paymentDone => 'Payment done';
+  String get paymentPending => 'Payment baaki';
+  String awaitingLabourConfirm(String name) => '$name ke confirm ka intezaar';
+  String labourConfirmed(String name) => '$name ne confirm kar diya';
+  String labourDisputed(String name) => '$name ne aapatti darj ki';
+
   // ── Profile ───────────────────────────────────────────────────────────────
 
   String get shareProfile => 'Profile share karein';
@@ -990,6 +1023,51 @@ class _Hindi extends AppStrings {
   String get workerMarker => 'कारीगर';
   @override
   String get siteMarker => 'काम की जगह';
+  @override
+  String get requestRejected => 'मना कर दिया';
+  @override
+  String get rejectedTitle => 'काम वाले ने मना कर दिया';
+  @override
+  String rejectedBody(String name) =>
+      '$name ने यह रिक्वेस्ट रिजेक्ट कर दी। दूसरा काम वाला देख लें।';
+  @override
+  String rejectedAt(String time) => '$time पर रिजेक्ट हुई';
+  @override
+  String get findAnotherWorker => 'दूसरा काम वाला ढूँढें';
+  @override
+  String get markWorkDone => 'काम पूरा हुआ';
+  @override
+  String get markWorkDoneTitle => 'काम पूरा हो गया?';
+  @override
+  String markWorkDoneMessage(String name) =>
+      '$name का काम पूरा मार्क कर देंगे। उनसे कन्फर्म करने को कहा जाएगा।';
+  @override
+  String get yesWorkDone => 'हाँ, पूरा हुआ';
+  @override
+  String get workDoneMarked => 'काम पूरा मार्क कर दिया';
+  @override
+  String get markPaymentDone => 'पेमेंट डन';
+  @override
+  String get markPaymentTitle => 'पैसा दे दिया?';
+  @override
+  String markPaymentMessage(String name, int amount) =>
+      '₹$amount $name को दे दिया — रिकॉर्ड हो जाएगा और उनसे कन्फर्म करने को कहा जाएगा।';
+  @override
+  String get yesPaid => 'हाँ, दे दिया';
+  @override
+  String get paymentDoneMarked => 'पेमेंट डन मार्क कर दिया';
+  @override
+  String get notYet => 'अभी नहीं';
+  @override
+  String get paymentDone => 'पेमेंट डन';
+  @override
+  String get paymentPending => 'पेमेंट बाकी';
+  @override
+  String awaitingLabourConfirm(String name) => '$name के कन्फर्म का इंतज़ार';
+  @override
+  String labourConfirmed(String name) => '$name ने कन्फर्म कर दिया';
+  @override
+  String labourDisputed(String name) => '$name ने आपत्ति दर्ज की';
 
   @override
   String get shareProfile => 'प्रोफ़ाइल शेयर करें';
@@ -1671,6 +1749,51 @@ class _English extends AppStrings {
   String get workerMarker => 'Worker';
   @override
   String get siteMarker => 'Work site';
+  @override
+  String get requestRejected => 'Rejected';
+  @override
+  String get rejectedTitle => 'The worker said no';
+  @override
+  String rejectedBody(String name) =>
+      '$name rejected this request. Try another worker.';
+  @override
+  String rejectedAt(String time) => 'Rejected at $time';
+  @override
+  String get findAnotherWorker => 'Find another worker';
+  @override
+  String get markWorkDone => 'Work done';
+  @override
+  String get markWorkDoneTitle => 'Is the work finished?';
+  @override
+  String markWorkDoneMessage(String name) =>
+      "This marks $name's work complete. They will be asked to confirm it.";
+  @override
+  String get yesWorkDone => 'Yes, it is done';
+  @override
+  String get workDoneMarked => 'Marked the work complete';
+  @override
+  String get markPaymentDone => 'Payment done';
+  @override
+  String get markPaymentTitle => 'Has the payment been made?';
+  @override
+  String markPaymentMessage(String name, int amount) =>
+      'Paid ₹$amount to $name — this is recorded and they will be asked to confirm it.';
+  @override
+  String get yesPaid => 'Yes, paid';
+  @override
+  String get paymentDoneMarked => 'Marked the payment done';
+  @override
+  String get notYet => 'Not yet';
+  @override
+  String get paymentDone => 'Payment done';
+  @override
+  String get paymentPending => 'Payment pending';
+  @override
+  String awaitingLabourConfirm(String name) => 'Waiting for $name to confirm';
+  @override
+  String labourConfirmed(String name) => '$name confirmed it';
+  @override
+  String labourDisputed(String name) => '$name disputed it';
 
   @override
   String get shareProfile => 'Share profile';
@@ -2189,6 +2312,51 @@ class _Bhojpuri extends _Hindi {
   String get workerMarker => 'कारीगर';
   @override
   String get siteMarker => 'काम के जगह';
+  @override
+  String get requestRejected => 'मना कर देहलन';
+  @override
+  String get rejectedTitle => 'काम वाला मना कर देहलन';
+  @override
+  String rejectedBody(String name) =>
+      '$name ई रिक्वेस्ट रिजेक्ट कर देहलन। दूसरा काम वाला देख लीं।';
+  @override
+  String rejectedAt(String time) => '$time पर रिजेक्ट भइल';
+  @override
+  String get findAnotherWorker => 'दूसरा काम वाला खोजीं';
+  @override
+  String get markWorkDone => 'काम पूरा भइल';
+  @override
+  String get markWorkDoneTitle => 'काम पूरा हो गइल?';
+  @override
+  String markWorkDoneMessage(String name) =>
+      '$name के काम पूरा मार्क कर देब। उनसे कन्फर्म करे के कहल जाई।';
+  @override
+  String get yesWorkDone => 'हँ, पूरा भइल';
+  @override
+  String get workDoneMarked => 'काम पूरा मार्क कर देहनी';
+  @override
+  String get markPaymentDone => 'पेमेंट डन';
+  @override
+  String get markPaymentTitle => 'पइसा दे देहनी?';
+  @override
+  String markPaymentMessage(String name, int amount) =>
+      '₹$amount $name के दे देहनी — रिकॉर्ड हो जाई आ उनसे कन्फर्म करे के कहल जाई।';
+  @override
+  String get yesPaid => 'हँ, दे देहनी';
+  @override
+  String get paymentDoneMarked => 'पेमेंट डन मार्क कर देहनी';
+  @override
+  String get notYet => 'अभी ना';
+  @override
+  String get paymentDone => 'पेमेंट डन';
+  @override
+  String get paymentPending => 'पेमेंट बाकी';
+  @override
+  String awaitingLabourConfirm(String name) => '$name के कन्फर्म के बाट';
+  @override
+  String labourConfirmed(String name) => '$name कन्फर्म कर देहलन';
+  @override
+  String labourDisputed(String name) => '$name आपत्ति दर्ज कइलन';
 
   @override
   String get editProfile => 'प्रोफ़ाइल एडिट करीं';

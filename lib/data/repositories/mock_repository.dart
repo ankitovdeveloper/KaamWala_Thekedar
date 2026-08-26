@@ -203,10 +203,32 @@ class MockRepository implements KaamWalaRepository {
   }
 
   @override
-  Future<Booking> cancelBooking(int bookingId) async {
-    final updated = _bookings
-        .firstWhere((b) => b.id == bookingId)
-        .copyWith(status: BookingStatus.cancelled);
+  Future<Booking> cancelBooking(int bookingId) async =>
+      _patch(bookingId, (b) => b.copyWith(status: BookingStatus.cancelled));
+
+  @override
+  Future<Booking> completeBooking(int bookingId) async => _patch(
+    bookingId,
+    (b) => b.copyWith(
+      status: BookingStatus.completed,
+      jobStage: JobStage.completed,
+      completedBy: 'thekedar',
+    ),
+  );
+
+  @override
+  Future<Booking> markPaymentDone(int bookingId) async => _patch(
+    bookingId,
+    (b) => b.copyWith(
+      paymentStatus: 'completed',
+      paymentMarkedAt: DateTime.now(),
+    ),
+  );
+
+  /// Applies [change] to one row and hands back the updated copy — the mock's
+  /// stand-in for the backend answering with the row it just wrote.
+  Future<Booking> _patch(int bookingId, Booking Function(Booking) change) {
+    final updated = change(_bookings.firstWhere((b) => b.id == bookingId));
     _bookings = [
       for (final b in _bookings)
         if (b.id == bookingId) updated else b,

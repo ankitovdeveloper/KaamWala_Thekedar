@@ -93,6 +93,21 @@ abstract interface class KaamWalaRepository {
   /// shown as it is.
   Future<ArrivalState> confirmArrival(int bookingId, String code);
 
+  /// `POST /thekedar/bookings/{id}/complete` — "the kaam is finished".
+  ///
+  /// The mirror of [confirmArrival]: starting the job took the worker's four
+  /// digits, and finishing it is declared here and then confirmed by the worker
+  /// from their own app. Until they do, it is one side's word.
+  Future<Booking> completeBooking(int bookingId);
+
+  /// `POST /thekedar/bookings/{id}/payment` — "the money is paid".
+  ///
+  /// Deliberately not folded into [completeBooking]: the kaam ending and the
+  /// money changing hands are different events, often hours apart, and one
+  /// button for both would record a payment that never happened. The backend
+  /// only accepts it once the booking is completed.
+  Future<Booking> markPaymentDone(int bookingId);
+
   /// `GET /thekedar/bookings/end-reasons` — the chips the "stop this kaam"
   /// sheet renders.
   Future<List<EndReason>> endReasons();

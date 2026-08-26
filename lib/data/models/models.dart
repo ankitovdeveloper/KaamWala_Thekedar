@@ -550,6 +550,13 @@ class Booking {
     this.hasReview = false,
     this.labourPhone,
     this.site,
+    this.completedBy,
+    this.completionConfirmedAt,
+    this.paymentStatus = 'pending',
+    this.paymentMarkedAt,
+    this.paymentConfirmedAt,
+    this.completionResponse,
+    this.completionRemark,
   });
 
   final int id;
@@ -573,6 +580,33 @@ class Booking {
   /// Where the job is. Tracking draws the worker moving towards this; null on
   /// bookings created before coordinates were captured.
   final GeoPoint? site;
+
+  /// Who called the kaam finished — 'thekedar' or 'labour'. Null while it is
+  /// still running.
+  final String? completedBy;
+
+  /// When the worker agreed that it really was finished. Null means this
+  /// Thekedar's word is still the only one on the record.
+  final DateTime? completionConfirmedAt;
+
+  /// `pending` | `completed` | `refunded`, straight off the row.
+  final String paymentStatus;
+
+  /// When this Thekedar marked the money paid, and when the worker confirmed it
+  /// arrived. Two facts, not one — which is the whole point of keeping both.
+  final DateTime? paymentMarkedAt;
+  final DateTime? paymentConfirmedAt;
+
+  /// What the worker answered when asked to sign the job off: 'agreed',
+  /// 'disputed', or null while they have not answered.
+  ///
+  /// A refusal is the answer this Thekedar most needs to see. Nothing else on
+  /// the row says it — status and payment_status both still read as finished,
+  /// because they record what *was declared*, not what was agreed.
+  final String? completionResponse;
+
+  /// The worker's own words alongside that answer. Always there on a refusal.
+  final String? completionRemark;
 
   factory Booking.fromJson(Map<String, dynamic> json) {
     final labourJson = json.mapOrNull('labour');
@@ -601,6 +635,13 @@ class Booking {
       hasReview: json['review'] != null,
       labourPhone: labourJson?.strOrNull('phone'),
       site: GeoPoint.fromJson(json),
+      completedBy: json.strOrNull('completed_by'),
+      completionConfirmedAt: json.date('completion_confirmed_at'),
+      paymentStatus: json.strOrNull('payment_status') ?? 'pending',
+      paymentMarkedAt: json.date('payment_marked_at'),
+      paymentConfirmedAt: json.date('payment_confirmed_at'),
+      completionResponse: json.strOrNull('completion_response'),
+      completionRemark: json.strOrNull('completion_remark'),
     );
   }
 
@@ -639,10 +680,49 @@ class Booking {
   bool get isTrackable =>
       status == BookingStatus.accepted && jobStage != JobStage.completed;
 
+  /// True while this Thekedar could still call the kaam finished.
+  bool get canComplete => status == BookingStatus.accepted;
+
+  /// True once the money has been marked paid.
+  bool get paymentDone => paymentStatus == 'completed';
+
+  /// True while the payment is still owed on a job that is otherwise done —
+  /// which is when the "Payment done" button belongs on the card.
+  bool get canMarkPayment =>
+      status == BookingStatus.completed && !paymentDone;
+
+  /// True while the worker has not answered this Thekedar's "kaam poora hua aur
+  /// payment bhi ho gaya". Worth saying on the card: it is the difference
+  /// between one side having declared it and both sides agreeing.
+  bool get awaitingLabourConfirm =>
+      status == BookingStatus.completed &&
+      completedBy == 'thekedar' &&
+      completionResponse == null;
+
+  /// The worker said no — the kaam or the money is contested. The loudest thing
+  /// this card can say, and nothing else on the row says it.
+  bool get completionDisputed => completionResponse == 'disputed';
+
+  /// True once both sides say the kaam is finished — either because the worker
+  /// agreed, or because they were the one who called it done.
+  ///
+  /// Neither is true of a booking closed before this handshake existed, which is
+  /// why it is not simply `!awaitingLabourConfirm`: an old row should claim
+  /// nothing rather than claim agreement nobody gave.
+  bool get completionSettled =>
+      completionResponse == 'agreed' || completedBy == 'labour';
+
   Booking copyWith({
     BookingStatus? status,
     JobStage? jobStage,
     bool? hasReview,
+    String? completedBy,
+    DateTime? completionConfirmedAt,
+    String? paymentStatus,
+    DateTime? paymentMarkedAt,
+    DateTime? paymentConfirmedAt,
+    String? completionResponse,
+    String? completionRemark,
   }) => Booking(
     id: id,
     labour: labour,
@@ -659,6 +739,13 @@ class Booking {
     hasReview: hasReview ?? this.hasReview,
     labourPhone: labourPhone,
     site: site,
+    completedBy: completedBy ?? this.completedBy,
+    completionConfirmedAt: completionConfirmedAt ?? this.completionConfirmedAt,
+    paymentStatus: paymentStatus ?? this.paymentStatus,
+    paymentMarkedAt: paymentMarkedAt ?? this.paymentMarkedAt,
+    paymentConfirmedAt: paymentConfirmedAt ?? this.paymentConfirmedAt,
+    completionResponse: completionResponse ?? this.completionResponse,
+    completionRemark: completionRemark ?? this.completionRemark,
   );
 }
 
@@ -683,10 +770,20 @@ class TrackingUpdate {
     this.arrivalConfirmedAt,
     this.canTerminate = false,
     this.termination,
+    this.declined = false,
+    this.declinedAt,
   });
 
   /// False while the request is still with the worker.
   final bool accepted;
+
+  /// True once the worker has turned the request down. The other half of
+  /// [accepted] being false: without it the screen cannot tell "still deciding"
+  /// from "said no", and settles on waiting for ever.
+  final bool declined;
+
+  /// When they refused, so the card can say when rather than only that.
+  final DateTime? declinedAt;
 
   final JobStage stage;
 
@@ -752,10 +849,13 @@ class TrackingUpdate {
       final t? => JobTermination.fromJson(t),
       _ => null,
     },
+    declined: json.strOrNull('status') == 'declined',
+    declinedAt: json.date('declined_at'),
   );
 
   /// "8 min door" / "Kaam shuru ho gaya" — the tracking card's headline.
   String etaLabelIn(AppStrings s) {
+    if (declined) return s.requestRejected;
     if (!accepted) return s.waitingForAccept;
     if (stage == JobStage.working) return s.workStarted;
     if (stage == JobStage.completed) return s.workFinished;

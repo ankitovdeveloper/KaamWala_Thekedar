@@ -9,6 +9,7 @@ import 'package:kaamwala_thekedar/data/repositories/kaamwala_repository.dart';
 import 'package:kaamwala_thekedar/data/session.dart';
 import 'package:kaamwala_thekedar/features/account/account_screen.dart';
 import 'package:kaamwala_thekedar/features/bookings/bookings_screen.dart';
+import 'package:kaamwala_thekedar/features/bookings/widgets/booking_card.dart';
 import 'package:kaamwala_thekedar/features/bookings/widgets/booking_tabs.dart';
 import 'package:kaamwala_thekedar/features/search/search_screen.dart';
 import 'package:kaamwala_thekedar/features/shell/home_shell.dart';
@@ -118,6 +119,14 @@ void main() {
     });
   });
 
+  /// Scrolls "Meri Bookings" down to the finished rows. Four cards do not fit on
+  /// a phone, and a ListView never builds what is below the fold — so without
+  /// this the completed bookings simply are not in the tree to be found.
+  Future<void> scrollBookings(WidgetTester tester) async {
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+  }
+
   group('Bookings', () {
     testWidgets('tab switch narrows the list to pending only', (tester) async {
       await tester.pumpWidget(host(const BookingsScreen()));
@@ -137,6 +146,124 @@ void main() {
       // Only Suresh's booking is pending in the mock set.
       expect(find.text('Suresh Yadav'), findsOneWidget);
       expect(find.text('Ramesh Kumar'), findsNothing);
+    });
+
+    testWidgets('a running job offers "kaam poora hua"; finished ones ask for '
+        'the money', (tester) async {
+      await tester.pumpWidget(host(const BookingsScreen()));
+      await tester.pumpAndSettle();
+
+      // Booking 101 is accepted and under way.
+      expect(find.text('Kaam poora hua'), findsOneWidget);
+
+      // The finished ones are below the fold on a phone.
+      await scrollBookings(tester);
+      expect(find.text('Payment done'), findsWidgets);
+      expect(find.text('Payment baaki'), findsWidgets);
+    });
+
+    testWidgets('marking the kaam done asks first, then waits on the worker',
+        (tester) async {
+      await tester.pumpWidget(host(const BookingsScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Kaam poora hua'));
+      await tester.pumpAndSettle();
+
+      // Behind a confirm: it ends the job for both sides.
+      expect(find.text('Kaam poora ho gaya?'), findsOneWidget);
+      await tester.tap(find.text('Haan, poora hua'));
+      await tester.pumpAndSettle();
+
+      // One side's word so far, and the card says whose answer is missing.
+      expect(
+        find.textContaining('ke confirm ka intezaar'),
+        findsOneWidget,
+        reason: 'the worker still has to agree the kaam is finished',
+      );
+      // Nothing left to mark done on that row.
+      expect(find.text('Kaam poora hua'), findsNothing);
+    });
+
+    testWidgets('a stray tap cannot mark the payment done', (tester) async {
+      await tester.pumpWidget(host(const BookingsScreen()));
+      await tester.pumpAndSettle();
+      await scrollBookings(tester);
+
+      await tester.tap(find.text('Payment done').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Paisa de diya?'), findsOneWidget);
+      await tester.tap(find.text('Abhi nahi'));
+      await tester.pumpAndSettle();
+
+      // Backed out, so the row still offers it and still reads as unpaid.
+      expect(find.text('Payment done'), findsWidgets);
+      expect(find.text('Payment baaki'), findsWidgets);
+    });
+  });
+
+  group('Booking card wrap-up state', () {
+    Booking finished({String? response, String? remark}) => Booking(
+      id: 501,
+      labour: Mock.labours.first.ref,
+      skillName: 'Painter',
+      workDate: DateTime(2026, 8, 26),
+      dayType: DayType.full,
+      price: 400,
+      status: BookingStatus.completed,
+      jobStage: JobStage.completed,
+      completedBy: 'thekedar',
+      paymentStatus: 'completed',
+      completionResponse: response,
+      completionRemark: remark,
+    );
+
+    Widget card(Booking booking) => host(
+      Scaffold(
+        body: SingleChildScrollView(
+          child: BookingCard(
+            booking: booking,
+            onCall: () {},
+            onDetails: () {},
+            onCancel: () {},
+            onReview: () {},
+            onTrack: () {},
+            onComplete: () {},
+            onPaymentDone: () {},
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('says whose answer is still missing', (tester) async {
+      await tester.pumpWidget(card(finished()));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('ke confirm ka intezaar'), findsOneWidget);
+    });
+
+    testWidgets('an agreement reads as settled', (tester) async {
+      await tester.pumpWidget(card(finished(response: 'agreed')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('ne confirm kar diya'), findsOneWidget);
+    });
+
+    testWidgets('a refusal is shown with the worker\'s own words',
+        (tester) async {
+      await tester.pumpWidget(
+        card(finished(response: 'disputed', remark: 'Paisa nahi mila')),
+      );
+      await tester.pumpAndSettle();
+
+      // Nothing else on the row says this: status and payment both still read
+      // as finished, because they record what was declared.
+      expect(
+        find.textContaining('ne aapatti darj ki: Paisa nahi mila'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('ke confirm ka intezaar'), findsNothing);
     });
   });
 

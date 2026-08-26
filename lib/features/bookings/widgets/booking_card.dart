@@ -19,6 +19,8 @@ class BookingCard extends StatelessWidget {
     required this.onCancel,
     required this.onReview,
     required this.onTrack,
+    required this.onComplete,
+    required this.onPaymentDone,
   });
 
   final Booking booking;
@@ -27,6 +29,11 @@ class BookingCard extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onReview;
   final VoidCallback onTrack;
+
+  /// "Kaam poora hua" and then "Payment done" — the two halves of wrapping a
+  /// job up. Two taps because they are two facts, usually hours apart.
+  final VoidCallback onComplete;
+  final VoidCallback onPaymentDone;
 
   (String, KwStatusTone) _status(AppStrings s) => switch (booking.status) {
     BookingStatus.accepted => (s.statusConfirmed, KwStatusTone.confirmed),
@@ -117,6 +124,43 @@ class BookingCard extends StatelessWidget {
                     Gap.vXs,
                     _info(Icons.schedule_rounded, booking.dayType.labelIn(s)),
                   ],
+                  // On a finished job these two lines are the whole story: has
+                  // the money moved, and has the worker agreed it is settled.
+                  if (booking.isDone) ...[
+                    Gap.vXs,
+                    _info(
+                      booking.paymentDone
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.payments_outlined,
+                      booking.paymentDone ? s.paymentDone : s.paymentPending,
+                    ),
+                    if (booking.completionDisputed) ...[
+                      Gap.vXs,
+                      // The one line on this card that contradicts the rest of
+                      // it, so it gets the colour: status and payment both still
+                      // read as finished, because they record what was declared.
+                      _info(
+                        Icons.report_gmailerrorred_rounded,
+                        booking.completionRemark?.isNotEmpty == true
+                            ? '${s.labourDisputed(booking.labour.name)}: '
+                                  '${booking.completionRemark}'
+                            : s.labourDisputed(booking.labour.name),
+                        tone: AppColors.danger,
+                      ),
+                    ] else if (booking.awaitingLabourConfirm) ...[
+                      Gap.vXs,
+                      _info(
+                        Icons.hourglass_empty_rounded,
+                        s.awaitingLabourConfirm(booking.labour.name),
+                      ),
+                    ] else if (booking.completionSettled) ...[
+                      Gap.vXs,
+                      _info(
+                        Icons.verified_outlined,
+                        s.labourConfirmed(booking.labour.name),
+                      ),
+                    ],
+                  ],
                 ],
               ),
             ),
@@ -174,6 +218,12 @@ class BookingCard extends StatelessWidget {
             filled: true,
             onPressed: onTrack,
           ),
+        if (booking.canComplete)
+          KwChipButton(
+            label: s.markWorkDone,
+            icon: Icons.task_alt_rounded,
+            onPressed: onComplete,
+          ),
         KwChipButton(
           label: s.call,
           icon: Icons.phone_outlined,
@@ -186,6 +236,14 @@ class BookingCard extends StatelessWidget {
         KwChipButton(label: s.details, onPressed: onDetails),
       ],
       BookingStatus.completed => [
+        // The money is the loudest thing left on a finished job.
+        if (booking.canMarkPayment)
+          KwChipButton(
+            label: s.markPaymentDone,
+            icon: Icons.payments_outlined,
+            filled: true,
+            onPressed: onPaymentDone,
+          ),
         if (booking.hasReview)
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -213,16 +271,23 @@ class BookingCard extends StatelessWidget {
     };
   }
 
-  Widget _info(IconData icon, String text) {
+  /// [tone] overrides the muted default — used only where the line contradicts
+  /// the rest of the card, which is a thing worth colouring.
+  Widget _info(IconData icon, String text, {Color? tone}) {
     return Row(
       children: [
-        Icon(icon, size: 14, color: AppColors.muted),
+        Icon(icon, size: 14, color: tone ?? AppColors.muted),
         const SizedBox(width: 5),
         Expanded(
           child: Text(
             text,
-            style: AppType.caption,
-            maxLines: 1,
+            style: tone == null
+                ? AppType.caption
+                : AppType.caption.copyWith(
+                    color: tone,
+                    fontWeight: FontWeight.w600,
+                  ),
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ),

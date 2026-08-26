@@ -216,11 +216,18 @@ class KwChipButton extends StatelessWidget {
               Icon(icon, size: 13, color: fg),
               const SizedBox(width: 5),
             ],
-            Text(
-              label,
-              style: AppType.buttonSmall.copyWith(
-                color: fg,
-                fontWeight: filled ? FontWeight.w600 : FontWeight.w500,
+            // Flexible, not a bare Text: these chips live in a Wrap, which hands
+            // each child the full row width to measure against, so a long label
+            // at large font scale paints straight past the chip's own edge.
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.buttonSmall.copyWith(
+                  color: fg,
+                  fontWeight: filled ? FontWeight.w600 : FontWeight.w500,
+                ),
               ),
             ),
           ],

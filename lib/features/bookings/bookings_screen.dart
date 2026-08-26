@@ -9,6 +9,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_typography.dart';
 import '../../data/models/models.dart';
+import '../../data/repositories/kaamwala_repository.dart';
 import '../../data/session.dart';
 import '../../widgets/kw_async.dart';
 import '../../widgets/kw_common.dart';
@@ -30,7 +31,8 @@ class BookingsScreen extends StatefulWidget {
   State<BookingsScreen> createState() => _BookingsScreenState();
 }
 
-class _BookingsScreenState extends State<BookingsScreen> {
+class _BookingsScreenState extends State<BookingsScreen>
+    with WidgetsBindingObserver {
   BookingTab _tab = BookingTab.all;
 
   late final Loadable<List<Booking>> _bookings = Loadable(
@@ -40,6 +42,10 @@ class _BookingsScreenState extends State<BookingsScreen> {
   @override
   void initState() {
     super.initState();
+    // Every row here is a decision somebody else can make: the worker accepts,
+    // refuses, or walks off, and none of it reaches this screen on its own.
+    // Coming back to the app is the moment to find out.
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _bookings.load();
     });
@@ -47,8 +53,15 @@ class _BookingsScreenState extends State<BookingsScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _bookings.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Silent: the rows already on screen stay up while the new ones land.
+    if (state == AppLifecycleState.resumed) _bookings.load(silent: true);
   }
 
   void _selectTab(BookingTab tab) {
@@ -116,6 +129,81 @@ class _BookingsScreenState extends State<BookingsScreen> {
           if (b.id == booking.id) updated else b,
       ]);
       _toast(s.bookingCancelled);
+      _bookings.load(silent: true);
+    } on Object catch (e) {
+      if (mounted) _toast(describeError(context, e));
+    }
+  }
+
+  /// "Kaam poora hua". Behind a confirm because it ends the job for both sides
+  /// and puts a confirmation prompt on the worker's screen — not something to
+  /// fire off a stray tap in a list.
+  Future<void> _complete(Booking booking) async {
+    final s = context.s;
+    if (!await _ask(s.markWorkDoneTitle, s.markWorkDoneMessage(booking.labour.name),
+        s.yesWorkDone)) {
+      return;
+    }
+    await _apply(booking, (repo) => repo.completeBooking(booking.id),
+        s.workDoneMarked);
+  }
+
+  /// "Payment done". Same reasoning, and the same prompt lands on the worker's
+  /// side — they are the ones who have to say the money actually arrived.
+  Future<void> _paymentDone(Booking booking) async {
+    final s = context.s;
+    if (!await _ask(s.markPaymentTitle,
+        s.markPaymentMessage(booking.labour.name, booking.price), s.yesPaid)) {
+      return;
+    }
+    await _apply(booking, (repo) => repo.markPaymentDone(booking.id),
+        s.paymentDoneMarked);
+  }
+
+  /// Yes/no dialog shared by the two wrap-up actions.
+  Future<bool> _ask(String title, String message, String confirmLabel) async {
+    final s = context.s;
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title, style: AppType.h4),
+        content: Text(message, style: AppType.bodyMuted),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              s.notYet,
+              style: AppType.buttonSmall.copyWith(color: AppColors.muted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              confirmLabel,
+              style: AppType.buttonSmall.copyWith(color: AppColors.successDark),
+            ),
+          ),
+        ],
+      ),
+    );
+    return answer == true && mounted;
+  }
+
+  /// Runs one booking action, patches the row in place so it does not jump, and
+  /// refreshes quietly behind it.
+  Future<void> _apply(
+    Booking booking,
+    Future<Booking> Function(KaamWalaRepository repo) action,
+    String toast,
+  ) async {
+    try {
+      final updated = await action(context.repo);
+      if (!mounted) return;
+      _bookings.setValue([
+        for (final b in _rows)
+          if (b.id == booking.id) updated else b,
+      ]);
+      _toast(toast);
       _bookings.load(silent: true);
     } on Object catch (e) {
       if (mounted) _toast(describeError(context, e));
@@ -279,14 +367,24 @@ class _BookingsScreenState extends State<BookingsScreen> {
               ).pushNamed(Routes.labourDetail, arguments: booking.labour.id),
               onCancel: () => _cancel(booking),
               onReview: () => _review(booking),
-              onTrack: () => Navigator.of(
-                context,
-              ).pushNamed(Routes.tracking, arguments: booking),
+              onComplete: () => _complete(booking),
+              onPaymentDone: () => _paymentDone(booking),
+              // The tracking screen is where a refusal or a stopped job is
+              // learned about, so coming back from it is the one moment this
+              // list is guaranteed to be out of date.
+              onTrack: () => _track(booking),
             ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _track(Booking booking) async {
+    await Navigator.of(
+      context,
+    ).pushNamed(Routes.tracking, arguments: booking);
+    if (mounted) _bookings.load(silent: true);
   }
 
   void _call(Booking booking) {

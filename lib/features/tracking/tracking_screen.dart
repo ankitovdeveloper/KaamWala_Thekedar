@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/animations/entrance.dart';
 import '../../core/animations/pressable.dart';
+import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
@@ -79,18 +80,30 @@ class _TrackingScreenState extends State<TrackingScreen> {
           return Stack(
             children: [
               Positioned.fill(
-                child: switch (latest.position) {
-                  // No fix yet: the request is still with the worker, so there
-                  // is nothing to plot and a map would just be an empty city.
-                  null => _AwaitingAccept(name: widget.booking.labour.name),
-                  final position => TrackingMap(
-                    worker: position,
-                    previous: _session.previous?.position,
-                    destination: latest.destination ?? widget.booking.site,
-                    stage: latest.stage,
-                    routePoints: _session.routePoints,
-                  ),
-                },
+                // A refusal also has no position, so it has to be checked before
+                // the null case below — otherwise a rejected request renders as
+                // "waiting for them to accept", which is what it used to do.
+                child: latest.declined
+                    ? _RequestRejected(
+                        name: widget.booking.labour.name,
+                        at: latest.declinedAt,
+                      )
+                    : switch (latest.position) {
+                        // No fix yet: the request is still with the worker, so
+                        // there is nothing to plot and a map would just be an
+                        // empty city.
+                        null => _AwaitingAccept(
+                          name: widget.booking.labour.name,
+                        ),
+                        final position => TrackingMap(
+                          worker: position,
+                          previous: _session.previous?.position,
+                          destination:
+                              latest.destination ?? widget.booking.site,
+                          stage: latest.stage,
+                          routePoints: _session.routePoints,
+                        ),
+                      },
               ),
               Positioned(top: 0, left: 0, right: 0, child: _header()),
               Positioned(
@@ -189,9 +202,28 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   ),
                 ],
               ),
-              Gap.v20,
-              StageTimeline(stage: update.stage, reached: update.accepted),
-              ..._notes(update),
+              // A timeline on a refused request would draw four steps that are
+              // never going to happen. One line saying what became of it is the
+              // whole story.
+              if (update.declined)
+                Padding(
+                  padding: const EdgeInsets.only(top: Gap.xxl),
+                  child: Text(
+                    switch (update.declinedAt) {
+                      final at? => '${s.rejectedTitle} · ${s.rejectedAt(_clock(at))}',
+                      null => s.rejectedTitle,
+                    },
+                    style: AppType.bodyStrong.copyWith(
+                      fontSize: 13,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                )
+              else ...[
+                Gap.v20,
+                StageTimeline(stage: update.stage, reached: update.accepted),
+                ..._notes(update),
+              ],
               if (update.termination case final ended?) ...[
                 Gap.v20,
                 _EndedNote(ended: ended),
@@ -209,6 +241,18 @@ class _TrackingScreenState extends State<TrackingScreen> {
                       ? KwButtonVariant.outline
                       : KwButtonVariant.yellow,
                   onPressed: () => _confirmArrival(update),
+                ),
+              ],
+              // The kaam is under way, so the next thing that happens is it
+              // finishing — and this screen is where the Thekedar is watching
+              // from, so the button belongs here as well as in the list.
+              if (update.stage == JobStage.working && !update.wasTerminated) ...[
+                Gap.v20,
+                KwButton(
+                  label: s.markWorkDone,
+                  icon: Icons.task_alt_rounded,
+                  variant: KwButtonVariant.yellow,
+                  onPressed: _completeJob,
                 ),
               ],
               if (update.canTerminate) ...[
@@ -261,6 +305,54 @@ class _TrackingScreenState extends State<TrackingScreen> {
     );
 
     if (started == true) await _session.refresh();
+  }
+
+  /// Marks the kaam finished from here, behind a confirm: it ends the job for
+  /// both sides and puts a confirmation prompt on the worker's screen.
+  ///
+  /// The session stops polling once the sample comes back completed, so the
+  /// screen settles on the finished state by itself.
+  Future<void> _completeJob() async {
+    final s = context.s;
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(s.markWorkDoneTitle, style: AppType.h4),
+        content: Text(
+          s.markWorkDoneMessage(widget.booking.labour.name),
+          style: AppType.bodyMuted,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              s.notYet,
+              style: AppType.buttonSmall.copyWith(color: AppColors.muted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              s.yesWorkDone,
+              style: AppType.buttonSmall.copyWith(color: AppColors.successDark),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await context.repo.completeBooking(widget.booking.id);
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(s.workDoneMarked)));
+      await _session.refresh();
+    } on Object catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(describeError(context, e))));
+    }
   }
 
   /// Opens the "stop this kaam" sheet, and pulls one more sample so the card
@@ -397,6 +489,70 @@ class _EndedNote extends StatelessWidget {
       ),
     ],
   );
+}
+
+/// The worker said no.
+///
+/// This screen used to have no way of showing that: the tracking endpoint
+/// answered a declined booking with an error, and a failed poll looks exactly
+/// like a lost connection — so the Thekedar was left watching "waiting for them
+/// to accept" spin on a request that had already been refused. Now it is said
+/// plainly, with a way straight back to looking for someone else.
+class _RequestRejected extends StatelessWidget {
+  const _RequestRejected({required this.name, this.at});
+
+  final String name;
+  final DateTime? at;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    return ColoredBox(
+      color: AppColors.surfaceAlt,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(Gap.x4l),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.cancel_outlined,
+                size: 40,
+                color: AppColors.danger,
+              ),
+              Gap.v20,
+              Text(s.rejectedTitle, style: AppType.h3, textAlign: TextAlign.center),
+              Gap.vXs,
+              Text(
+                s.rejectedBody(name),
+                style: AppType.bodyMuted,
+                textAlign: TextAlign.center,
+              ),
+              if (at case final when_?) ...[
+                Gap.vXs,
+                Text(
+                  s.rejectedAt(
+                    '${when_.hour.toString().padLeft(2, '0')}:'
+                    '${when_.minute.toString().padLeft(2, '0')}',
+                  ),
+                  style: AppType.caption,
+                ),
+              ],
+              Gap.v20,
+              KwButton(
+                label: s.findAnotherWorker,
+                icon: Icons.search_rounded,
+                // Straight to the search tab: the Thekedar still needs somebody
+                // today, and the booking they were watching is closed.
+                onPressed: () => Navigator.of(context)
+                    .pushNamedAndRemoveUntil(Routes.home, (_) => false),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// The gap between sending a request and the worker answering it.

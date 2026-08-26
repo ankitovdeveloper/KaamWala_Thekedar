@@ -53,9 +53,12 @@ class TrackingSession extends ChangeNotifier {
   /// last known position on screen rather than blanking the map.
   Object? get fatalError => _latest == null ? _error : null;
 
-  /// Nothing left to follow: the job finished, or somebody stopped it part-way.
+  /// Nothing left to follow: the job finished, somebody stopped it part-way, or
+  /// the worker turned the request down before it ever started.
   bool get isFinished =>
-      _latest?.stage == JobStage.completed || _latest?.wasTerminated == true;
+      _latest?.stage == JobStage.completed ||
+      _latest?.wasTerminated == true ||
+      _latest?.declined == true;
 
   /// Fetches once immediately, then every [interval].
   void start() {

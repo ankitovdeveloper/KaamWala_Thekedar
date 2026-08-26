@@ -15,8 +15,8 @@
 abstract final class ApiConfig {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    // defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
-    defaultValue: 'http://localhost/RoziRoti/public/api/v1',
+    defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
+    // defaultValue: 'http://localhost/kaamwala_api/public/api/v1',
   );
 
   /// Forces the mock repository even when a base URL is present — handy for

@@ -99,6 +99,18 @@ TrackingUpdate _endedByLabour() => TrackingUpdate(
   ),
 );
 
+/// The worker turned the request down. On the wire this looks almost exactly
+/// like a pending sample — no position, nothing to plot — which is why the
+/// status is the only thing that can tell them apart.
+TrackingUpdate _rejected() => TrackingUpdate(
+  stage: JobStage.pending,
+  accepted: false,
+  declined: true,
+  destination: _site,
+  isLive: false,
+  declinedAt: DateTime(2026, 8, 26, 10, 42),
+);
+
 Booking _booking() => Mock.bookings().firstWhere((b) => b.id == 101);
 
 /// Taps the end-job sheet's confirm button, scrolling it into view first.
@@ -164,8 +176,27 @@ void main() {
       });
 
       expect(update.accepted, isFalse);
+      expect(update.declined, isFalse, reason: 'still deciding, not refused');
       expect(update.position, isNull);
       expect(update.etaLabelIn(AppStrings.hinglish), 'Accept ka intezaar');
+    });
+
+    test('a refused booking is told apart from one still being decided', () {
+      final update = TrackingUpdate.fromJson(const {
+        'job_stage': 'pending',
+        'status': 'declined',
+        'declined_at': '2026-08-26T10:42:00+05:30',
+        'position': null,
+      });
+
+      expect(update.accepted, isFalse);
+      expect(update.declined, isTrue);
+      expect(update.declinedAt?.hour, 10);
+      expect(
+        update.etaLabelIn(AppStrings.hinglish),
+        'Reject kar di',
+        reason: 'never "Accept ka intezaar" — that request has been answered',
+      );
     });
   });
 
@@ -252,6 +283,29 @@ void main() {
         repo.calls,
         callsAtStop,
         reason: 'a stopped job must not keep hitting the server',
+      );
+
+      session.dispose();
+    });
+
+    test('polling stops once the worker rejects the request', () async {
+      final repo = _ScriptedRepository([_rejected()]);
+
+      final session = TrackingSession(
+        repository: repo,
+        bookingId: 101,
+        interval: const Duration(milliseconds: 10),
+      )..start();
+
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      final callsAtStop = repo.calls;
+      expect(session.isFinished, isTrue);
+
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(
+        repo.calls,
+        callsAtStop,
+        reason: 'there is nothing left to follow on a refused request',
       );
 
       session.dispose();
@@ -471,6 +525,60 @@ void main() {
       expect(find.text('2 ghante 15 min'), findsOneWidget);
 
       // Nothing left to do from here.
+      expect(find.text('Arrived mark karein'), findsNothing);
+      expect(find.text('Kaam band karein'), findsNothing);
+    });
+
+    testWidgets('offers to close the kaam once it is actually under way', (
+      tester,
+    ) async {
+      final repo = _ScriptedRepository([_working()]);
+
+      await tester.pumpWidget(
+        host(TrackingScreen(booking: _booking()), repository: repo),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      // This screen is where the Thekedar watches from, so the button that ends
+      // the job belongs here as well as in the list.
+      expect(find.text('Kaam poora hua'), findsOneWidget);
+
+      await tester.tap(find.text('Kaam poora hua'));
+      await tester.pumpAndSettle();
+
+      // Never on a stray tap — it ends the job for both sides.
+      expect(find.text('Kaam poora ho gaya?'), findsOneWidget);
+    });
+
+    testWidgets('nothing to close on a job that never started', (tester) async {
+      final repo = _ScriptedRepository([_waiting()]);
+
+      await tester.pumpWidget(
+        host(TrackingScreen(booking: _booking()), repository: repo),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Kaam poora hua'), findsNothing);
+    });
+
+    testWidgets('says the worker rejected it instead of waiting for ever', (
+      tester,
+    ) async {
+      final repo = _ScriptedRepository([_rejected()]);
+
+      await tester.pumpWidget(
+        host(TrackingScreen(booking: _booking()), repository: repo),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Kaam wale ne mana kar diya'), findsOneWidget);
+      // The whole bug in one assertion: this screen used to sit here.
+      expect(find.text('Request bhej di gayi'), findsNothing);
+      expect(find.text('Dusra kaam wala dhundhein'), findsOneWidget);
+      // And nothing on a refused request is actionable.
       expect(find.text('Arrived mark karein'), findsNothing);
       expect(find.text('Kaam band karein'), findsNothing);
     });
