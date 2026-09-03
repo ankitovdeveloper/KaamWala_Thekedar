@@ -7,6 +7,7 @@ import 'package:kaamwala_thekedar/data/session.dart';
 import 'package:kaamwala_thekedar/features/account/account_screen.dart';
 import 'package:kaamwala_thekedar/features/auth/login_screen.dart';
 import 'package:kaamwala_thekedar/features/auth/otp_screen.dart';
+import 'package:kaamwala_thekedar/features/booking_detail/booking_detail_screen.dart';
 import 'package:kaamwala_thekedar/features/bookings/bookings_screen.dart';
 import 'package:kaamwala_thekedar/features/labour_detail/labour_detail_screen.dart';
 import 'package:kaamwala_thekedar/features/profile/profile_screen.dart';
@@ -96,6 +97,15 @@ void main() {
     expectsCleanLayoutEverywhere('Bookings', BookingsScreen.new);
   });
 
+  group('Booking detail', () {
+    // The densest screen in the app: a map, a timeline, a worker card and a
+    // contextual action row, all in one scroll.
+    expectsCleanLayoutEverywhere(
+      'Booking detail',
+      () => const BookingDetailScreen(bookingId: 101),
+    );
+  });
+
   group('Profile', () {
     expectsCleanLayoutEverywhere('Profile', ProfileScreen.new);
   });
@@ -118,6 +128,11 @@ void main() {
       textScale: 1.3,
     );
     expectsCleanLayoutEverywhere('Profile', ProfileScreen.new, textScale: 1.3);
+    expectsCleanLayoutEverywhere(
+      'Booking detail',
+      () => const BookingDetailScreen(bookingId: 101),
+      textScale: 1.3,
+    );
     expectsCleanLayoutEverywhere(
       'OTP',
       () => const OtpScreen(args: OtpArgs(phone: '9876543210')),

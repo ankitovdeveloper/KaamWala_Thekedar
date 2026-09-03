@@ -362,7 +362,8 @@ class _BookingsScreenState extends State<BookingsScreen>
             child: BookingCard(
               booking: booking,
               onCall: () => _call(booking),
-              onDetails: () => Navigator.of(
+              onDetails: () => _details(booking),
+              onBookAgain: () => Navigator.of(
                 context,
               ).pushNamed(Routes.labourDetail, arguments: booking.labour.id),
               onCancel: () => _cancel(booking),
@@ -378,6 +379,15 @@ class _BookingsScreenState extends State<BookingsScreen>
         );
       },
     );
+  }
+
+  /// The booking's own record. Every action lives on that screen too, so
+  /// anything could have moved while it was open — hence the refetch on return.
+  Future<void> _details(Booking booking) async {
+    await Navigator.of(
+      context,
+    ).pushNamed(Routes.bookingDetail, arguments: booking);
+    if (mounted) _bookings.load(silent: true);
   }
 
   Future<void> _track(Booking booking) async {

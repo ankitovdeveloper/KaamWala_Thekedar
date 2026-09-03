@@ -4,6 +4,7 @@ import '../../data/models/models.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/otp_screen.dart';
 import '../../features/auth/splash_screen.dart';
+import '../../features/booking_detail/booking_detail_screen.dart';
 import '../../features/labour_detail/labour_detail_screen.dart';
 import '../../features/search/labours_map_screen.dart';
 import '../../features/shell/home_shell.dart';
@@ -19,6 +20,11 @@ abstract final class Routes {
   static const home = '/home';
   static const laboursMap = '/labours-map';
   static const labourDetail = '/labour';
+
+  /// One booking's whole record. Takes a [Booking] (the row the list already
+  /// has, used as a preview while the full record loads) or a bare booking id.
+  static const bookingDetail = '/booking';
+
   static const tracking = '/track';
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) =>
@@ -39,6 +45,16 @@ abstract final class Routes {
             preview: preview,
           ),
           final int id => LabourDetailScreen(labourId: id),
+          _ => const SizedBox.shrink(),
+        }, settings),
+        bookingDetail => _detail(switch (settings.arguments) {
+          // The list row carries the worker's name and the status, which is
+          // enough to paint the header while the full record loads.
+          final Booking preview => BookingDetailScreen(
+            bookingId: preview.id,
+            preview: preview,
+          ),
+          final int id => BookingDetailScreen(bookingId: id),
           _ => const SizedBox.shrink(),
         }, settings),
         tracking => _slideUp(

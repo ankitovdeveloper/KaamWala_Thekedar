@@ -16,6 +16,7 @@ class BookingCard extends StatelessWidget {
     required this.booking,
     required this.onCall,
     required this.onDetails,
+    required this.onBookAgain,
     required this.onCancel,
     required this.onReview,
     required this.onTrack,
@@ -25,7 +26,17 @@ class BookingCard extends StatelessWidget {
 
   final Booking booking;
   final VoidCallback onCall;
+
+  /// Opens this booking's own record — what happened on it, step by step.
+  ///
+  /// Used to open the worker's profile, which answered a different question
+  /// than the one a tap on a booking is asking.
   final VoidCallback onDetails;
+
+  /// Opens the worker's profile to book them again — the one place on this card
+  /// where the *worker* really is what the tap is about.
+  final VoidCallback onBookAgain;
+
   final VoidCallback onCancel;
   final VoidCallback onReview;
   final VoidCallback onTrack;
@@ -266,7 +277,8 @@ class BookingCard extends StatelessWidget {
           ),
       ],
       BookingStatus.cancelled || BookingStatus.declined => [
-        KwChipButton(label: s.bookAgain, onPressed: onDetails),
+        KwChipButton(label: s.details, onPressed: onDetails),
+        KwChipButton(label: s.bookAgain, filled: true, onPressed: onBookAgain),
       ],
     };
   }

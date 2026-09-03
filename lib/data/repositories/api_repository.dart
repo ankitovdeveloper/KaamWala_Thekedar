@@ -133,6 +133,12 @@ class ApiRepository implements KaamWalaRepository {
   }
 
   @override
+  Future<BookingDetail> bookingDetail(int bookingId) async =>
+      BookingDetail.fromJson(
+        _obj(await _api.get('thekedar/bookings/$bookingId')),
+      );
+
+  @override
   Future<Booking> createBooking({
     required int labourId,
     int? skillId,

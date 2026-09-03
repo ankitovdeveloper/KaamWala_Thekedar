@@ -749,6 +749,483 @@ class Booking {
   );
 }
 
+/// Where one step of a booking's history stands — `App\Support\BookingStory`.
+enum BookingStepState {
+  /// It happened, and there is a time behind it.
+  done,
+
+  /// The one thing the booking is waiting on right now.
+  current,
+
+  /// Still ahead. The server only sends these on a booking that can still get
+  /// there — a stopped job drops the steps it never reached rather than leaving
+  /// them looking due.
+  pending,
+
+  /// A refusal, a dispute, a stop.
+  failed;
+
+  static BookingStepState parse(String? v) => switch (v) {
+    'done' => done,
+    'current' => current,
+    'failed' => failed,
+    _ => pending,
+  };
+}
+
+/// Which step of the booking this is.
+///
+/// Parsed from the server's `code` rather than read off its `title`, because the
+/// app renders these in four languages and the API speaks only Hinglish. An
+/// unrecognised code — a step added to the backend after this build shipped —
+/// falls back to [BookingStep.title], so a newer server can add steps without
+/// the app dropping them on the floor.
+enum BookingStepCode {
+  requested,
+  accepted,
+  declined,
+  onTheWay,
+  arrived,
+  workStarted,
+  workDone,
+  payment,
+  labourConfirm,
+  review,
+  cancelled,
+  terminated,
+  unknown;
+
+  static BookingStepCode parse(String? v) => switch (v) {
+    'requested' => requested,
+    'accepted' => accepted,
+    'declined' => declined,
+    'on_the_way' => onTheWay,
+    'arrived' => arrived,
+    'work_started' => workStarted,
+    'work_done' => workDone,
+    'payment' => payment,
+    'labour_confirm' => labourConfirm,
+    'review' => review,
+    'cancelled' => cancelled,
+    'terminated' => terminated,
+    _ => unknown,
+  };
+}
+
+/// One line of "is booking par kya kya hua".
+@immutable
+class BookingStep {
+  const BookingStep({
+    required this.code,
+    required this.state,
+    required this.title,
+    this.note,
+    this.at,
+    this.actor,
+  });
+
+  final BookingStepCode code;
+  final BookingStepState state;
+
+  /// The server's own Hinglish wording. Only rendered for a [code] this build
+  /// does not know — everything else is localised from the code.
+  final String title;
+
+  /// The detail under the step: an amount, a dispute remark, the reason a job
+  /// was stopped. Free text the server owns, so it is shown as it arrives.
+  final String? note;
+
+  final DateTime? at;
+
+  /// `thekedar` or `labour` — which side did it. Null on a step nobody has
+  /// taken yet.
+  final String? actor;
+
+  factory BookingStep.fromJson(Map<String, dynamic> json) => BookingStep(
+    code: BookingStepCode.parse(json.strOrNull('code')),
+    state: BookingStepState.parse(json.strOrNull('state')),
+    title: json.str('title'),
+    note: json.strOrNull('note'),
+    at: json.date('at'),
+    actor: json.strOrNull('actor'),
+  );
+
+  bool get isDone => state == BookingStepState.done;
+  bool get isCurrent => state == BookingStepState.current;
+  bool get hasFailed => state == BookingStepState.failed;
+
+  /// True once this step is behind the booking rather than ahead of it — what
+  /// decides whether the timeline's connecting line is drawn filled.
+  bool get isReached => isDone || hasFailed;
+
+  bool get byLabour => actor == 'labour';
+
+  /// The step's headline in the session's language.
+  ///
+  /// Several steps read differently depending on where they stand — "payment ho
+  /// gaya" and "payment baaki hai" are the same step — so the state picks the
+  /// wording, not just the icon. An unrecognised code falls back to the
+  /// server's own [title], which is how a step added to the backend after this
+  /// build shipped still says something.
+  String titleIn(AppStrings s) => switch ((code, state)) {
+    (BookingStepCode.requested, _) => s.storyRequested,
+    (BookingStepCode.accepted, BookingStepState.done) => s.storyAccepted,
+    (BookingStepCode.accepted, _) => s.storyWaitingAccept,
+    (BookingStepCode.declined, _) => s.storyDeclined,
+    (BookingStepCode.onTheWay, BookingStepState.done) => s.storyDeparted,
+    (BookingStepCode.onTheWay, _) => s.storyWaitingDepart,
+    (BookingStepCode.arrived, BookingStepState.done) => s.storyArrived,
+    (BookingStepCode.arrived, _) => s.storyWaitingArrive,
+    (BookingStepCode.workStarted, BookingStepState.done) => s.storyWorkStarted,
+    // The only step that is an instruction rather than a report: nothing moves
+    // until this Thekedar types the code the worker reads out.
+    (BookingStepCode.workStarted, BookingStepState.current) =>
+      s.storyWaitingCode,
+    (BookingStepCode.workStarted, _) => s.storyWaitingStart,
+    (BookingStepCode.workDone, BookingStepState.done) => s.storyWorkDone,
+    (BookingStepCode.workDone, _) => s.storyWaitingDone,
+    (BookingStepCode.payment, BookingStepState.done) => s.storyPaid,
+    (BookingStepCode.payment, _) => s.storyWaitingPayment,
+    (BookingStepCode.labourConfirm, BookingStepState.done) =>
+      s.storyLabourAgreed,
+    (BookingStepCode.labourConfirm, BookingStepState.failed) =>
+      s.storyLabourDisputed,
+    (BookingStepCode.labourConfirm, _) => s.storyWaitingLabourConfirm,
+    (BookingStepCode.review, BookingStepState.done) => s.storyReviewed,
+    (BookingStepCode.review, _) => s.storyWaitingReview,
+    (BookingStepCode.cancelled, _) => s.storyCancelled,
+    (BookingStepCode.terminated, _) => s.storyTerminated,
+    (BookingStepCode.unknown, _) => title,
+  };
+}
+
+/// One of the points a booking has on the map.
+///
+/// The same shape serves all three — the job site, where the worker was standing
+/// when they accepted, and where they are now — because each is a coordinate
+/// plus some subset of "when", "how far from the kaam" and "is this current".
+@immutable
+class BookingPlace {
+  const BookingPlace({
+    required this.point,
+    this.at,
+    this.distanceKm,
+    this.isLive = true,
+    this.address,
+  });
+
+  final GeoPoint point;
+
+  /// When the worker was here. Null on the site (which does not move) and on a
+  /// fallback position, where the honest answer is "not recently".
+  final DateTime? at;
+
+  /// Distance to the job site — the number that makes a point worth showing.
+  final double? distanceKm;
+
+  /// False when this is the worker's registered address standing in for a phone
+  /// that has stopped reporting. A last known spot, not a live one.
+  final bool isLive;
+
+  final String? address;
+
+  static BookingPlace? fromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    final point = GeoPoint.fromJson(json);
+    if (point == null) return null;
+
+    return BookingPlace(
+      point: point,
+      at: json.date('at'),
+      distanceKm: json['distance_km'] == null ? null : json.dbl('distance_km'),
+      isLive: json['is_live'] == null || json.flag('is_live'),
+      address: json.strOrNull('address'),
+    );
+  }
+
+  /// '450 m door' / '2.4 km door' — null when there is nothing to measure to.
+  String? distanceLabelIn(AppStrings s) => distanceKm == null
+      ? null
+      : distanceKm! < 1
+      ? s.metresAway((distanceKm! * 1000).round())
+      : s.kmAway(distanceKm!.toStringAsFixed(1));
+}
+
+/// The three points, together.
+@immutable
+class BookingLocations {
+  const BookingLocations({this.site, this.acceptedFrom, this.live});
+
+  /// Where the kaam is.
+  final BookingPlace? site;
+
+  /// Where the worker was when they took the job. Kept on a finished booking:
+  /// it is a fact about the job, not a live position.
+  final BookingPlace? acceptedFrom;
+
+  /// Where they are now — served only while the job is still in flight. A
+  /// booking from last month is not a licence to keep watching somebody.
+  final BookingPlace? live;
+
+  factory BookingLocations.fromJson(Map<String, dynamic> json) =>
+      BookingLocations(
+        site: BookingPlace.fromJson(json.mapOrNull('site')),
+        acceptedFrom: BookingPlace.fromJson(json.mapOrNull('accepted_from')),
+        live: BookingPlace.fromJson(json.mapOrNull('live')),
+      );
+
+  bool get hasAny => site != null || acceptedFrom != null || live != null;
+}
+
+/// The money on a booking, with both halves of the record kept apart: what this
+/// Thekedar declared, and what the worker agreed to.
+@immutable
+class BookingPayment {
+  const BookingPayment({
+    required this.amount,
+    this.status = 'pending',
+    this.done = false,
+    this.offeredAmount = 0,
+    this.agreedPrice,
+    this.markedAt,
+    this.confirmedAt,
+    this.awaitingLabourConfirm = false,
+  });
+
+  /// What is actually owed — the negotiated price where there is one.
+  final int amount;
+  final String status;
+  final bool done;
+  final int offeredAmount;
+  final int? agreedPrice;
+
+  /// When this Thekedar said the money was paid, and when the worker agreed it
+  /// arrived. Two facts, which is the whole point of keeping both.
+  final DateTime? markedAt;
+  final DateTime? confirmedAt;
+
+  final bool awaitingLabourConfirm;
+
+  /// True when the price on the booking is not the price that was first offered
+  /// — worth showing, because it is the number an argument starts from.
+  bool get wasNegotiated => agreedPrice != null && agreedPrice != offeredAmount;
+
+  factory BookingPayment.fromJson(Map<String, dynamic> json) => BookingPayment(
+    amount: json.intVal('amount'),
+    status: json.strOrNull('status') ?? 'pending',
+    done: json.flag('done'),
+    offeredAmount: json.intVal('offered_amount'),
+    agreedPrice: json['agreed_price'] == null
+        ? null
+        : json.intVal('agreed_price'),
+    markedAt: json.date('marked_at'),
+    confirmedAt: json.date('confirmed_at'),
+    awaitingLabourConfirm: json.flag('awaiting_labour_confirm'),
+  );
+}
+
+/// How a booking stands, in one word.
+enum BookingOutcomeKind {
+  /// Still with the worker.
+  waiting,
+
+  /// Accepted and under way.
+  running,
+
+  /// Finished, and nobody is contesting it.
+  completed,
+
+  /// Finished, and the worker said no to it. `status` and `payment_status` both
+  /// still read as done, because they record what was *declared*.
+  disputed,
+
+  /// Dropped before anybody set off.
+  cancelled,
+
+  /// Stopped part-way, with a reason.
+  terminated,
+
+  /// The worker turned it down.
+  declined;
+
+  static BookingOutcomeKind parse(String? v) => switch (v) {
+    'running' => running,
+    'completed' => completed,
+    'disputed' => disputed,
+    'cancelled' => cancelled,
+    'terminated' => terminated,
+    'declined' => declined,
+    _ => waiting,
+  };
+
+  /// True for the outcomes that need saying loudly rather than filed away.
+  bool get isBad =>
+      this == disputed ||
+      this == cancelled ||
+      this == terminated ||
+      this == declined;
+}
+
+/// What closed the booking, and what either side said about it.
+@immutable
+class BookingOutcome {
+  const BookingOutcome({
+    this.kind = BookingOutcomeKind.waiting,
+    this.termination,
+    this.cancelledBy,
+    this.cancelledAt,
+    this.cancellationReason,
+    this.declinedAt,
+    this.completedBy,
+    this.completedAt,
+    this.completionResponse,
+    this.completionRemark,
+    this.completionRespondedAt,
+    this.workedMinutes,
+  });
+
+  final BookingOutcomeKind kind;
+
+  /// Set only where somebody stopped the job part-way with a reason the other
+  /// side is meant to read. A plain cancel has none.
+  final JobTermination? termination;
+
+  final String? cancelledBy;
+  final DateTime? cancelledAt;
+  final String? cancellationReason;
+  final DateTime? declinedAt;
+
+  final String? completedBy;
+  final DateTime? completedAt;
+
+  /// `agreed` | `disputed` | null while the worker has not answered.
+  final String? completionResponse;
+
+  /// Their own words alongside that answer. Always there on a refusal.
+  final String? completionRemark;
+  final DateTime? completionRespondedAt;
+
+  /// Minutes actually worked. Null when the work never began.
+  final int? workedMinutes;
+
+  factory BookingOutcome.fromJson(Map<String, dynamic> json) => BookingOutcome(
+    kind: BookingOutcomeKind.parse(json.strOrNull('kind')),
+    termination: switch (json.mapOrNull('termination')) {
+      final t? => JobTermination.fromJson(t),
+      _ => null,
+    },
+    cancelledBy: json.strOrNull('cancelled_by'),
+    cancelledAt: json.date('cancelled_at'),
+    cancellationReason: json.strOrNull('cancellation_reason'),
+    declinedAt: json.date('declined_at'),
+    completedBy: json.strOrNull('completed_by'),
+    completedAt: json.date('completed_at'),
+    completionResponse: json.strOrNull('completion_response'),
+    completionRemark: json.strOrNull('completion_remark'),
+    completionRespondedAt: json.date('completion_responded_at'),
+    workedMinutes: json['worked_minutes'] == null
+        ? null
+        : json.intVal('worked_minutes'),
+  );
+
+  bool get cancelledByLabour => cancelledBy == 'labour';
+
+  /// When this booking stopped being open, whichever way it ended.
+  DateTime? get closedAt => cancelledAt ?? declinedAt ?? completedAt;
+}
+
+/// Which actions the detail screen may offer.
+///
+/// Decided by the server rather than re-derived here, so a button can never
+/// appear on a booking the endpoint behind it would refuse — the two used to
+/// drift, and the app found out by showing an error after the tap.
+@immutable
+class BookingActions {
+  const BookingActions({
+    this.cancel = false,
+    this.track = false,
+    this.confirmArrival = false,
+    this.complete = false,
+    this.markPayment = false,
+    this.terminate = false,
+    this.review = false,
+  });
+
+  final bool cancel;
+  final bool track;
+  final bool confirmArrival;
+  final bool complete;
+  final bool markPayment;
+  final bool terminate;
+  final bool review;
+
+  factory BookingActions.fromJson(Map<String, dynamic> json) => BookingActions(
+    cancel: json.flag('cancel'),
+    track: json.flag('track'),
+    confirmArrival: json.flag('confirm_arrival'),
+    complete: json.flag('complete'),
+    markPayment: json.flag('mark_payment'),
+    terminate: json.flag('terminate'),
+    review: json.flag('review'),
+  );
+}
+
+/// `GET /thekedar/bookings/{id}` — one booking, whole.
+///
+/// The row's own fields sit at the top level of the payload, so [booking] is
+/// parsed by the same code that reads "Meri Bookings"; everything else hangs off
+/// it. `labour` is a superset of the trimmed [LabourRef] the list carries, which
+/// is why the full [Labour] parses from the same key.
+@immutable
+class BookingDetail {
+  const BookingDetail({
+    required this.booking,
+    required this.labour,
+    required this.timeline,
+    required this.locations,
+    required this.payment,
+    required this.outcome,
+    required this.can,
+  });
+
+  final Booking booking;
+
+  /// The worker's full record — rating, skills, jobs done, and the phone once
+  /// the booking has unlocked it.
+  final Labour labour;
+
+  /// Oldest first.
+  final List<BookingStep> timeline;
+
+  final BookingLocations locations;
+  final BookingPayment payment;
+  final BookingOutcome outcome;
+  final BookingActions can;
+
+  factory BookingDetail.fromJson(Map<String, dynamic> json) => BookingDetail(
+    booking: Booking.fromJson(json),
+    labour: Labour.fromJson(json.mapOrNull('labour') ?? const {}),
+    timeline: json
+        .listOfMaps('timeline')
+        .map(BookingStep.fromJson)
+        .toList(growable: false),
+    locations: BookingLocations.fromJson(
+      json.mapOrNull('locations') ?? const {},
+    ),
+    payment: BookingPayment.fromJson(json.mapOrNull('payment') ?? const {}),
+    outcome: BookingOutcome.fromJson(json.mapOrNull('outcome') ?? const {}),
+    can: BookingActions.fromJson(json.mapOrNull('can') ?? const {}),
+  );
+
+  /// The step the booking is sitting on — what to say at the top of the screen.
+  BookingStep? get currentStep =>
+      timeline.where((step) => step.isCurrent).firstOrNull;
+
+  /// The last thing that actually happened.
+  BookingStep? get lastReachedStep =>
+      timeline.where((step) => step.isReached).lastOrNull;
+}
+
 /// `GET /thekedar/bookings/{id}/track` — one poll of where the worker is.
 ///
 /// Polled rather than pushed: a GET every few seconds needs no socket

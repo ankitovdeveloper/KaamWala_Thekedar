@@ -160,6 +160,227 @@ class MockRepository implements KaamWalaRepository {
   }
 
   @override
+  Future<BookingDetail> bookingDetail(int bookingId) {
+    _advanceSimulations();
+
+    final booking = _bookings.firstWhere(
+      (b) => b.id == bookingId,
+      orElse: () =>
+          throw const ApiException('Ye booking nahi mili.', statusCode: 404),
+    );
+
+    final labour = Mock.labourById(booking.labour.id);
+    final job = _jobs[bookingId];
+
+    return _delayed(
+      BookingDetail(
+        booking: booking,
+        labour: labour,
+        timeline: _mockTimeline(booking),
+        locations: BookingLocations(
+          site: switch (booking.site) {
+            final site? => BookingPlace(point: site, address: booking.address),
+            _ => null,
+          },
+          // The worker's own spot on the map stands in for where they accepted
+          // from, which is what the real accept does — it snapshots the
+          // position they answered at.
+          acceptedFrom: switch (labour.latLng) {
+            // Kept on a finished booking, the way the server keeps it: it is a
+            // fact about the job, not a live position. Absent only where there
+            // was never an acceptance to snapshot.
+            final origin? when booking.status != BookingStatus.pending =>
+              BookingPlace(
+                point: origin,
+                distanceKm: booking.site == null
+                    ? null
+                    : origin.distanceKmTo(booking.site!),
+              ),
+            _ => null,
+          },
+          live: switch (job?.sample().position) {
+            final position? when booking.status == BookingStatus.accepted =>
+              BookingPlace(
+                point: position,
+                at: DateTime.now(),
+                distanceKm: booking.site == null
+                    ? null
+                    : position.distanceKmTo(booking.site!),
+              ),
+            _ => null,
+          },
+        ),
+        payment: BookingPayment(
+          amount: booking.price,
+          offeredAmount: booking.price,
+          status: booking.paymentStatus,
+          done: booking.paymentDone,
+          markedAt: booking.paymentMarkedAt,
+          awaitingLabourConfirm: booking.awaitingLabourConfirm,
+        ),
+        outcome: BookingOutcome(
+          kind: switch (booking.status) {
+            BookingStatus.declined => BookingOutcomeKind.declined,
+            BookingStatus.cancelled => BookingOutcomeKind.cancelled,
+            BookingStatus.accepted => BookingOutcomeKind.running,
+            BookingStatus.completed when booking.completionDisputed =>
+              BookingOutcomeKind.disputed,
+            BookingStatus.completed => BookingOutcomeKind.completed,
+            BookingStatus.pending => BookingOutcomeKind.waiting,
+          },
+          completedBy: booking.completedBy,
+          completionResponse: booking.completionResponse,
+          completionRemark: booking.completionRemark,
+        ),
+        can: BookingActions(
+          cancel: booking.isActive,
+          track: booking.isTrackable,
+          confirmArrival: job != null && job.hasAccepted && !job.arrivalConfirmed,
+          complete: booking.canComplete,
+          markPayment: booking.canMarkPayment,
+          terminate: booking.isTrackable,
+          review: booking.isDone && !booking.hasReview,
+        ),
+      ),
+    );
+  }
+
+  /// The steps the server would have built, derived from the same row.
+  ///
+  /// Deliberately follows `App\Support\BookingStory`'s one rule that matters:
+  /// a booking that ended early stops at the step it died on rather than
+  /// listing the ones it never reached. A demo that shows "payment baaki" under
+  /// a cancelled job teaches the wrong thing about the screen.
+  List<BookingStep> _mockTimeline(Booking booking) {
+    final now = DateTime.now();
+    final stageRank = JobStage.values.indexOf(booking.jobStage);
+
+    BookingStep step(
+      BookingStepCode code,
+      BookingStepState state, {
+      DateTime? at,
+      String? note,
+      String actor = 'labour',
+    }) => BookingStep(
+      code: code,
+      state: state,
+      // The mock never exercises the unknown-code fallback, so the title only
+      // has to be non-empty.
+      title: code.name,
+      note: note,
+      at: at,
+      actor: actor,
+    );
+
+    final steps = <BookingStep>[
+      step(
+        BookingStepCode.requested,
+        BookingStepState.done,
+        at: now.subtract(const Duration(hours: 11)),
+        note: '₹${booking.price} · ${booking.dayType.name}',
+        actor: 'thekedar',
+      ),
+    ];
+
+    if (booking.status == BookingStatus.declined) {
+      steps.add(
+        step(
+          BookingStepCode.declined,
+          BookingStepState.failed,
+          at: now.subtract(const Duration(hours: 10)),
+        ),
+      );
+      return steps;
+    }
+
+    final accepted = booking.status != BookingStatus.pending;
+    steps.add(
+      accepted
+          ? step(
+              BookingStepCode.accepted,
+              BookingStepState.done,
+              at: now.subtract(const Duration(hours: 10)),
+            )
+          : step(BookingStepCode.accepted, BookingStepState.current),
+    );
+
+    for (final (code, rank) in const [
+      (BookingStepCode.onTheWay, 1),
+      (BookingStepCode.arrived, 2),
+      (BookingStepCode.workStarted, 2),
+    ]) {
+      final reached = stageRank >= rank;
+      steps.add(
+        step(
+          code,
+          reached
+              ? BookingStepState.done
+              : accepted && stageRank == rank - 1
+              ? BookingStepState.current
+              : BookingStepState.pending,
+          at: reached
+              ? now.subtract(Duration(hours: 9 - rank))
+              : null,
+          actor: code == BookingStepCode.workStarted ? 'thekedar' : 'labour',
+        ),
+      );
+    }
+
+    if (booking.isCancelled) {
+      // Drop the trailing steps the job never got to, then say what stopped it.
+      while (steps.isNotEmpty && !steps.last.isReached) {
+        steps.removeLast();
+      }
+      steps.add(
+        step(
+          BookingStepCode.cancelled,
+          BookingStepState.failed,
+          at: now.subtract(const Duration(hours: 1)),
+          actor: 'thekedar',
+        ),
+      );
+      return steps;
+    }
+
+    steps.addAll([
+      step(
+        BookingStepCode.workDone,
+        booking.isDone ? BookingStepState.done : BookingStepState.pending,
+        at: booking.isDone ? now.subtract(const Duration(hours: 2)) : null,
+        actor: booking.completedBy ?? 'thekedar',
+      ),
+      step(
+        BookingStepCode.payment,
+        booking.paymentDone
+            ? BookingStepState.done
+            : booking.isDone
+            ? BookingStepState.current
+            : BookingStepState.pending,
+        at: booking.paymentMarkedAt,
+        note: '₹${booking.price}',
+        actor: 'thekedar',
+      ),
+      step(
+        BookingStepCode.labourConfirm,
+        switch (booking) {
+          final b when b.completionDisputed => BookingStepState.failed,
+          final b when b.completionSettled => BookingStepState.done,
+          final b when b.awaitingLabourConfirm => BookingStepState.current,
+          _ => BookingStepState.pending,
+        },
+        note: booking.completionRemark,
+      ),
+      step(
+        BookingStepCode.review,
+        booking.hasReview ? BookingStepState.done : BookingStepState.pending,
+        actor: 'thekedar',
+      ),
+    ]);
+
+    return steps;
+  }
+
+  @override
   Future<Booking> createBooking({
     required int labourId,
     int? skillId,

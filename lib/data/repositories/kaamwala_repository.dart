@@ -59,6 +59,15 @@ abstract interface class KaamWalaRepository {
   /// `GET /thekedar/bookings?tab=`
   Future<List<Booking>> bookings({String tab = 'all'});
 
+  /// `GET /thekedar/bookings/{id}` — one booking read back as a history: every
+  /// step that happened and when, the worker's full record, the money, and the
+  /// points on the map.
+  ///
+  /// Not a richer [bookings] row: the list answers "what have I got on", this
+  /// answers "what happened on this one", and the second question needs the
+  /// nine scattered timestamps walked in order. See `App\Support\BookingStory`.
+  Future<BookingDetail> bookingDetail(int bookingId);
+
   /// `POST /thekedar/bookings`
   Future<Booking> createBooking({
     required int labourId,

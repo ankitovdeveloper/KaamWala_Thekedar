@@ -391,6 +391,61 @@ class AppStrings {
   String labourConfirmed(String name) => '$name ne confirm kar diya';
   String labourDisputed(String name) => '$name ne aapatti darj ki';
 
+  // ── Booking detail (the step-by-step record of one booking) ───────────────
+  // The step titles are localised from the server's `code`, not shown as it
+  // sent them: the API speaks only Hinglish, and this screen is the one place
+  // a booking's whole history is read back. Anything the server puts in a
+  // step's `note` — a dispute remark, a stop reason — is free text and does
+  // come through as it arrives.
+
+  String get bookingDetailTitle => 'Booking ki puri jankari';
+  String get bookingWhatHappened => 'Kya kya hua';
+  String get bookingOnMap => 'Map par';
+  String get bookingWorkerSection => 'Kaam wale ki jankari';
+  String get bookingMoneySection => 'Paisa';
+  String get bookingDetailsSection => 'Booking';
+  String get bookingNotesLabel => 'Aapka note';
+  String get siteOnMap => 'Kaam ki jagah';
+  String get acceptedFromHere => 'Accept karte waqt yahan the';
+  String get workerRightNow => 'Abhi yahan hain';
+  String get workerLastSeen => 'Aakhri location';
+  String get openFullProfile => 'Poori profile dekhein';
+  String get amountToPay => 'Dena hai';
+  String get amountPaid => 'De diya';
+  String offeredWas(int amount) => 'Pehle ₹$amount offer kiya tha';
+  String get nothingHappenedYet => 'Is booking par abhi kuch hua nahi';
+  String get workedForLabel => 'Kaam hua';
+  String bookingNumber(int id) => 'Booking #$id';
+  String get justNow => 'Abhi abhi';
+  String minutesAgo(int minutes) => '$minutes min pehle';
+  String hoursAgo(int hours) => '$hours ghante pehle';
+  String daysAgo(int days) => '$days din pehle';
+
+  // One line per (step, state) the timeline can be in. Read straight off
+  // `App\Support\BookingStory`'s step codes.
+  String get storyRequested => 'Booking bheji';
+  String get storyWaitingAccept => 'Kaam wale ke jawab ka intezaar';
+  String get storyAccepted => 'Kaam wale ne accept kiya';
+  String get storyDeclined => 'Kaam wale ne mana kar diya';
+  String get storyDeparted => 'Kaam wala site ke liye nikla';
+  String get storyWaitingDepart => 'Nikalne ka intezaar';
+  String get storyArrived => 'Kaam wala site par pahunch gaya';
+  String get storyWaitingArrive => 'Pahunchne ka intezaar';
+  String get storyWorkStarted => 'Kaam shuru hua';
+  String get storyWaitingCode => 'Code daal kar kaam shuru karein';
+  String get storyWaitingStart => 'Kaam shuru hona baaki';
+  String get storyWorkDone => 'Kaam poora hua';
+  String get storyWaitingDone => 'Kaam poora hona baaki';
+  String get storyPaid => 'Payment ho gaya';
+  String get storyWaitingPayment => 'Payment baaki hai';
+  String get storyLabourAgreed => 'Kaam wale ne confirm kar diya';
+  String get storyLabourDisputed => 'Kaam wale ne aapatti darj ki';
+  String get storyWaitingLabourConfirm => 'Kaam wale ke confirm ka intezaar';
+  String get storyReviewed => 'Aapne review diya';
+  String get storyWaitingReview => 'Review dena baaki';
+  String get storyCancelled => 'Booking cancel ho gayi';
+  String get storyTerminated => 'Kaam beech mein band hua';
+
   // ── Profile ───────────────────────────────────────────────────────────────
 
   String get shareProfile => 'Profile share karein';
@@ -1068,6 +1123,95 @@ class _Hindi extends AppStrings {
   String labourConfirmed(String name) => '$name ने कन्फर्म कर दिया';
   @override
   String labourDisputed(String name) => '$name ने आपत्ति दर्ज की';
+
+  @override
+  String get bookingDetailTitle => 'बुकिंग की पूरी जानकारी';
+  @override
+  String get bookingWhatHappened => 'क्या क्या हुआ';
+  @override
+  String get bookingOnMap => 'नक़्शे पर';
+  @override
+  String get bookingWorkerSection => 'काम वाले की जानकारी';
+  @override
+  String get bookingMoneySection => 'पैसा';
+  @override
+  String get bookingDetailsSection => 'बुकिंग';
+  @override
+  String get bookingNotesLabel => 'आपका नोट';
+  @override
+  String get siteOnMap => 'काम की जगह';
+  @override
+  String get acceptedFromHere => 'एक्सेप्ट करते वक़्त यहाँ थे';
+  @override
+  String get workerRightNow => 'अभी यहाँ हैं';
+  @override
+  String get workerLastSeen => 'आख़िरी लोकेशन';
+  @override
+  String get openFullProfile => 'पूरी प्रोफ़ाइल देखें';
+  @override
+  String get amountToPay => 'देना है';
+  @override
+  String get amountPaid => 'दे दिया';
+  @override
+  String offeredWas(int amount) => 'पहले ₹$amount ऑफ़र किया था';
+  @override
+  String get nothingHappenedYet => 'इस बुकिंग पर अभी कुछ हुआ नहीं';
+  @override
+  String get workedForLabel => 'काम हुआ';
+  @override
+  String bookingNumber(int id) => 'बुकिंग #$id';
+  @override
+  String get justNow => 'अभी अभी';
+  @override
+  String minutesAgo(int minutes) => '$minutes मिनट पहले';
+  @override
+  String hoursAgo(int hours) => '$hours घंटे पहले';
+  @override
+  String daysAgo(int days) => '$days दिन पहले';
+  @override
+  String get storyRequested => 'बुकिंग भेजी';
+  @override
+  String get storyWaitingAccept => 'काम वाले के जवाब का इंतज़ार';
+  @override
+  String get storyAccepted => 'काम वाले ने एक्सेप्ट किया';
+  @override
+  String get storyDeclined => 'काम वाले ने मना कर दिया';
+  @override
+  String get storyDeparted => 'काम वाला साइट के लिए निकला';
+  @override
+  String get storyWaitingDepart => 'निकलने का इंतज़ार';
+  @override
+  String get storyArrived => 'काम वाला साइट पर पहुँच गया';
+  @override
+  String get storyWaitingArrive => 'पहुँचने का इंतज़ार';
+  @override
+  String get storyWorkStarted => 'काम शुरू हुआ';
+  @override
+  String get storyWaitingCode => 'कोड डाल कर काम शुरू करें';
+  @override
+  String get storyWaitingStart => 'काम शुरू होना बाकी';
+  @override
+  String get storyWorkDone => 'काम पूरा हुआ';
+  @override
+  String get storyWaitingDone => 'काम पूरा होना बाकी';
+  @override
+  String get storyPaid => 'पेमेंट हो गया';
+  @override
+  String get storyWaitingPayment => 'पेमेंट बाकी है';
+  @override
+  String get storyLabourAgreed => 'काम वाले ने कन्फर्म कर दिया';
+  @override
+  String get storyLabourDisputed => 'काम वाले ने आपत्ति दर्ज की';
+  @override
+  String get storyWaitingLabourConfirm => 'काम वाले के कन्फर्म का इंतज़ार';
+  @override
+  String get storyReviewed => 'आपने रिव्यू दिया';
+  @override
+  String get storyWaitingReview => 'रिव्यू देना बाकी';
+  @override
+  String get storyCancelled => 'बुकिंग कैंसिल हो गई';
+  @override
+  String get storyTerminated => 'काम बीच में बंद हुआ';
 
   @override
   String get shareProfile => 'प्रोफ़ाइल शेयर करें';
@@ -1796,6 +1940,95 @@ class _English extends AppStrings {
   String labourDisputed(String name) => '$name disputed it';
 
   @override
+  String get bookingDetailTitle => 'Booking details';
+  @override
+  String get bookingWhatHappened => 'What happened';
+  @override
+  String get bookingOnMap => 'On the map';
+  @override
+  String get bookingWorkerSection => 'About the worker';
+  @override
+  String get bookingMoneySection => 'Money';
+  @override
+  String get bookingDetailsSection => 'Booking';
+  @override
+  String get bookingNotesLabel => 'Your note';
+  @override
+  String get siteOnMap => 'Work site';
+  @override
+  String get acceptedFromHere => 'Where they were when they accepted';
+  @override
+  String get workerRightNow => 'Where they are now';
+  @override
+  String get workerLastSeen => 'Last known location';
+  @override
+  String get openFullProfile => 'See full profile';
+  @override
+  String get amountToPay => 'To pay';
+  @override
+  String get amountPaid => 'Paid';
+  @override
+  String offeredWas(int amount) => 'Originally offered ₹$amount';
+  @override
+  String get nothingHappenedYet => 'Nothing has happened on this booking yet';
+  @override
+  String get workedForLabel => 'Worked';
+  @override
+  String bookingNumber(int id) => 'Booking #$id';
+  @override
+  String get justNow => 'Just now';
+  @override
+  String minutesAgo(int minutes) => '$minutes min ago';
+  @override
+  String hoursAgo(int hours) => '$hours hr ago';
+  @override
+  String daysAgo(int days) => '$days days ago';
+  @override
+  String get storyRequested => 'Booking sent';
+  @override
+  String get storyWaitingAccept => 'Waiting for the worker to answer';
+  @override
+  String get storyAccepted => 'The worker accepted';
+  @override
+  String get storyDeclined => 'The worker turned it down';
+  @override
+  String get storyDeparted => 'The worker set off for the site';
+  @override
+  String get storyWaitingDepart => 'Waiting for them to set off';
+  @override
+  String get storyArrived => 'The worker reached the site';
+  @override
+  String get storyWaitingArrive => 'Waiting for them to arrive';
+  @override
+  String get storyWorkStarted => 'Work started';
+  @override
+  String get storyWaitingCode => 'Enter their code to start the work';
+  @override
+  String get storyWaitingStart => 'Work has not started yet';
+  @override
+  String get storyWorkDone => 'Work finished';
+  @override
+  String get storyWaitingDone => 'Work is not finished yet';
+  @override
+  String get storyPaid => 'Payment done';
+  @override
+  String get storyWaitingPayment => 'Payment is still due';
+  @override
+  String get storyLabourAgreed => 'The worker confirmed it';
+  @override
+  String get storyLabourDisputed => 'The worker disputed it';
+  @override
+  String get storyWaitingLabourConfirm => 'Waiting for the worker to confirm';
+  @override
+  String get storyReviewed => 'You left a review';
+  @override
+  String get storyWaitingReview => 'No review yet';
+  @override
+  String get storyCancelled => 'Booking cancelled';
+  @override
+  String get storyTerminated => 'Work stopped part-way';
+
+  @override
   String get shareProfile => 'Share profile';
   @override
   String get referralCodeSoon => 'Referral codes are coming soon';
@@ -2357,6 +2590,85 @@ class _Bhojpuri extends _Hindi {
   String labourConfirmed(String name) => '$name कन्फर्म कर देहलन';
   @override
   String labourDisputed(String name) => '$name आपत्ति दर्ज कइलन';
+
+  @override
+  String get bookingDetailTitle => 'बुकिंग के पूरा जानकारी';
+  @override
+  String get bookingWhatHappened => 'का का भइल';
+  @override
+  String get bookingWorkerSection => 'काम वाला के जानकारी';
+  @override
+  String get bookingNotesLabel => 'आपके नोट';
+  @override
+  String get acceptedFromHere => 'एक्सेप्ट करत घरी इहाँ रहलन';
+  @override
+  String get workerRightNow => 'अभी इहाँ बाड़न';
+  @override
+  String get workerLastSeen => 'आखिरी लोकेशन';
+  @override
+  String get openFullProfile => 'पूरा प्रोफ़ाइल देखीं';
+  @override
+  String get amountToPay => 'देवे के बा';
+  @override
+  String get amountPaid => 'दे देहनी';
+  @override
+  String offeredWas(int amount) => 'पहिले ₹$amount ऑफ़र कइल रहे';
+  @override
+  String get nothingHappenedYet => 'ई बुकिंग पर अभी कुछ भइल नइखे';
+  @override
+  String get workedForLabel => 'काम भइल';
+  @override
+  String get justNow => 'अभी अभी';
+  @override
+  String minutesAgo(int minutes) => '$minutes मिनट पहिले';
+  @override
+  String hoursAgo(int hours) => '$hours घंटा पहिले';
+  @override
+  String daysAgo(int days) => '$days दिन पहिले';
+  @override
+  String get storyRequested => 'बुकिंग भेजनी';
+  @override
+  String get storyWaitingAccept => 'काम वाला के जवाब के बाट';
+  @override
+  String get storyAccepted => 'काम वाला एक्सेप्ट कइलन';
+  @override
+  String get storyDeclined => 'काम वाला मना कर देहलन';
+  @override
+  String get storyDeparted => 'काम वाला साइट खातिर निकललन';
+  @override
+  String get storyWaitingDepart => 'निकले के बाट';
+  @override
+  String get storyArrived => 'काम वाला साइट पर पहुँच गइलन';
+  @override
+  String get storyWaitingArrive => 'पहुँचे के बाट';
+  @override
+  String get storyWorkStarted => 'काम शुरू भइल';
+  @override
+  String get storyWaitingCode => 'कोड डाल के काम शुरू करीं';
+  @override
+  String get storyWaitingStart => 'काम शुरू होखे के बाकी';
+  @override
+  String get storyWorkDone => 'काम पूरा भइल';
+  @override
+  String get storyWaitingDone => 'काम पूरा होखे के बाकी';
+  @override
+  String get storyPaid => 'पेमेंट हो गइल';
+  @override
+  String get storyWaitingPayment => 'पेमेंट बाकी बा';
+  @override
+  String get storyLabourAgreed => 'काम वाला कन्फर्म कर देहलन';
+  @override
+  String get storyLabourDisputed => 'काम वाला आपत्ति दर्ज कइलन';
+  @override
+  String get storyWaitingLabourConfirm => 'काम वाला के कन्फर्म के बाट';
+  @override
+  String get storyReviewed => 'आप रिव्यू देहनी';
+  @override
+  String get storyWaitingReview => 'रिव्यू देवे के बाकी';
+  @override
+  String get storyCancelled => 'बुकिंग कैंसिल हो गइल';
+  @override
+  String get storyTerminated => 'काम बीच में बंद भइल';
 
   @override
   String get editProfile => 'प्रोफ़ाइल एडिट करीं';

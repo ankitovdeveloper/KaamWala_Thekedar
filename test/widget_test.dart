@@ -226,6 +226,7 @@ void main() {
             booking: booking,
             onCall: () {},
             onDetails: () {},
+            onBookAgain: () {},
             onCancel: () {},
             onReview: () {},
             onTrack: () {},

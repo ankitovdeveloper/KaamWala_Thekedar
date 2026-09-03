@@ -353,6 +353,291 @@ void main() {
       expect(sent['offered_amount'], 450);
       expect(sent.containsKey('notes'), isFalse, reason: 'empty notes omitted');
     });
+
+    /// The payload below is a real response from
+    /// `GET /thekedar/bookings/{id}`, trimmed to the keys the app reads. Kept
+    /// verbatim rather than hand-rolled: the row's own fields sit at the top
+    /// level next to the extra blocks, and the whole point of that shape is
+    /// that one parser reads both.
+    test('bookingDetail parses the row, the story and the worker', () async {
+      final (:repo, :client) = _build(
+        (_) => (
+          status: 200,
+          body: _ok({
+            'id': 7,
+            'status': 'accepted',
+            'job_stage': 'on_the_way',
+            'stage_source': 'auto',
+            'offered_amount': 800,
+            'agreed_price': null,
+            'work_date': '2026-09-03',
+            'start_time': '09:00',
+            'day_type': 'full',
+            'address': 'Probe site, Indira Nagar',
+            'city': 'Lucknow',
+            'latitude': '26.8467000',
+            'longitude': '80.9462000',
+            'payment_status': 'pending',
+            // Superset of the trimmed `labour` the list carries, so the same
+            // key feeds both LabourRef and the full record.
+            'labour': {
+              'id': 3,
+              'name': 'Ankit Test App',
+              'phone': '9100000001',
+              'contact_unlocked': true,
+              'city': 'lucknow',
+              'daily_rate': 300,
+              'experience_years': 6,
+              'avg_rating': 4.6,
+              'ratings_count': 34,
+              'total_jobs': 41,
+              'is_on_duty': true,
+              'bio': '6 saal ka tajurba.',
+              'skills': [
+                {'id': 1, 'name': 'Electrician', 'icon': '⚡'},
+              ],
+              'is_saved': false,
+            },
+            'skill': {'id': 1, 'name': 'Electrician', 'icon': '⚡'},
+            'review': null,
+            'timeline': [
+              {
+                'code': 'requested',
+                'title': 'Booking bheji',
+                'note': '₹800 · Poora din',
+                'at': '2026-09-03T18:50:06+00:00',
+                'state': 'done',
+                'actor': 'thekedar',
+              },
+              {
+                'code': 'on_the_way',
+                'title': 'Kaam wala site ke liye nikla',
+                'note': 'GPS se apne aap update hua',
+                'at': '2026-09-03T18:20:06+00:00',
+                'state': 'done',
+                'actor': 'labour',
+              },
+              {
+                'code': 'arrived',
+                'title': 'Pahunchne ka intezaar',
+                'note': null,
+                'at': null,
+                'state': 'current',
+                'actor': 'labour',
+              },
+              // A step this build has no code for — must survive rather than
+              // being dropped, so a newer backend needs no app release.
+              {
+                'code': 'something_new',
+                'title': 'Kuch naya hua',
+                'note': null,
+                'at': null,
+                'state': 'pending',
+                'actor': null,
+              },
+            ],
+            'locations': {
+              'site': {
+                'latitude': 26.8467,
+                'longitude': 80.9462,
+                'address': 'Probe site, Indira Nagar',
+                'city': 'Lucknow',
+              },
+              'accepted_from': {
+                'latitude': 26.86,
+                'longitude': 80.95,
+                'at': '2026-09-03T18:10:06+00:00',
+                'distance_km': 1.5,
+              },
+              'live': {
+                'latitude': 26.79,
+                'longitude': 80.92,
+                'at': null,
+                'is_live': false,
+                'stale_after_minutes': 5,
+                'distance_km': 6.8,
+              },
+            },
+            'payment': {
+              'status': 'pending',
+              'done': false,
+              'amount': 800,
+              'offered_amount': 800,
+              'agreed_price': null,
+              'marked_at': null,
+              'confirmed_at': null,
+              'awaiting_labour_confirm': false,
+            },
+            'outcome': {
+              'kind': 'running',
+              'termination': null,
+              'worked_minutes': null,
+            },
+            'can': {
+              'cancel': true,
+              'track': true,
+              'confirm_arrival': true,
+              'complete': true,
+              'mark_payment': false,
+              'terminate': true,
+              'review': false,
+            },
+          }),
+        ),
+      );
+
+      final detail = await repo.bookingDetail(7);
+      expect(client.lastRequest!.url.path, endsWith('/thekedar/bookings/7'));
+
+      // The row, read by the same parser the list uses.
+      expect(detail.booking.id, 7);
+      expect(detail.booking.price, 800);
+      expect(detail.booking.jobStage, JobStage.onTheWay);
+      expect(detail.booking.site, isNotNull);
+
+      // The worker, at full depth — and the phone the list never carries.
+      expect(detail.labour.name, 'Ankit Test App');
+      expect(detail.labour.phone, '9100000001');
+      expect(detail.labour.totalJobs, 41);
+      expect(detail.labour.skills.single.name, 'Electrician');
+
+      expect(detail.timeline, hasLength(4));
+      expect(detail.timeline.first.code, BookingStepCode.requested);
+      expect(detail.timeline.first.isDone, isTrue);
+      expect(
+        detail.currentStep?.code,
+        BookingStepCode.arrived,
+        reason: 'the one step the booking is waiting on',
+      );
+      // Unknown code keeps the server's wording instead of vanishing.
+      final unknown = detail.timeline.last;
+      expect(unknown.code, BookingStepCode.unknown);
+      expect(unknown.titleIn(AppStrings.hinglish), 'Kuch naya hua');
+
+      expect(detail.locations.acceptedFrom!.distanceKm, 1.5);
+      expect(
+        detail.locations.live!.isLive,
+        isFalse,
+        reason: 'a last known spot, not a live one',
+      );
+
+      expect(detail.payment.amount, 800);
+      expect(detail.payment.done, isFalse);
+      expect(detail.outcome.kind, BookingOutcomeKind.running);
+      expect(detail.can.confirmArrival, isTrue);
+      expect(detail.can.markPayment, isFalse);
+    });
+
+    test('bookingDetail reads a disputed booking as contested', () async {
+      final (:repo, client: _) = _build(
+        (_) => (
+          status: 200,
+          body: _ok({
+            'id': 9,
+            'status': 'completed',
+            'job_stage': 'completed',
+            'offered_amount': 700,
+            'payment_status': 'completed',
+            'labour': {'id': 3, 'name': 'Ankit Test App'},
+            'timeline': [
+              {
+                'code': 'labour_confirm',
+                'title': 'Kaam wale ne aapatti darj ki',
+                'note': 'Poora paisa nahi mila',
+                'at': '2026-09-03T18:44:00+00:00',
+                'state': 'failed',
+                'actor': 'labour',
+              },
+            ],
+            'payment': {'amount': 700, 'done': true, 'status': 'completed'},
+            'outcome': {
+              'kind': 'disputed',
+              'completion_response': 'disputed',
+              'completion_remark': 'Poora paisa nahi mila',
+            },
+            'can': {'review': true},
+          }),
+        ),
+      );
+
+      final detail = await repo.bookingDetail(9);
+
+      // Everything else on the row still reads as finished and paid, because
+      // those columns record what was *declared*. Only these say nobody agreed.
+      expect(detail.booking.isDone, isTrue);
+      expect(detail.payment.done, isTrue);
+      expect(detail.outcome.kind, BookingOutcomeKind.disputed);
+      expect(detail.outcome.kind.isBad, isTrue);
+      expect(detail.outcome.completionRemark, 'Poora paisa nahi mila');
+      expect(detail.timeline.single.hasFailed, isTrue);
+    });
+
+    /// A stopped job is served with the steps it never reached left out, so
+    /// nothing on the screen reads as still due.
+    test('bookingDetail keeps a terminated job to what happened', () async {
+      final (:repo, client: _) = _build(
+        (_) => (
+          status: 200,
+          body: _ok({
+            'id': 11,
+            'status': 'cancelled',
+            'job_stage': 'working',
+            'offered_amount': 700,
+            'labour': {'id': 3, 'name': 'Ankit Test App'},
+            'timeline': [
+              {
+                'code': 'requested',
+                'title': 'Booking bheji',
+                'at': '2026-09-03T10:00:00+00:00',
+                'state': 'done',
+                'actor': 'thekedar',
+              },
+              {
+                'code': 'terminated',
+                'title': 'Kaam wale ne kaam beech mein band kiya',
+                'note': 'Tabiyat theek nahi hai · Band hone tak kaam: 2 ghante',
+                'at': '2026-09-03T13:00:00+00:00',
+                'state': 'failed',
+                'actor': 'labour',
+              },
+            ],
+            'locations': {'live': null},
+            'payment': {'amount': 700},
+            'outcome': {
+              'kind': 'terminated',
+              'termination': {
+                'by': 'labour',
+                'by_label': 'Kaam wale',
+                'reason_code': 'health',
+                'reason': 'Tabiyat theek nahi hai',
+                'at': '2026-09-03T13:00:00+00:00',
+                'stage_when_ended': 'working',
+                'worked_minutes': 120,
+              },
+            },
+            'can': <String, Object?>{},
+          }),
+        ),
+      );
+
+      final detail = await repo.bookingDetail(11);
+
+      expect(
+        detail.timeline.map((step) => step.code),
+        [BookingStepCode.requested, BookingStepCode.terminated],
+        reason: 'no "payment baaki" under a job that was stopped',
+      );
+      expect(detail.outcome.termination!.byLabour, isTrue);
+      expect(detail.outcome.termination!.workedLabel, '2 ghante');
+      expect(
+        detail.locations.live,
+        isNull,
+        reason: 'a closed booking is not a licence to keep watching somebody',
+      );
+      // Nothing on offer, so the screen shows no action it cannot perform.
+      expect(detail.can.cancel, isFalse);
+      expect(detail.can.track, isFalse);
+    });
   });
 
   group('Profile & account', () {
