@@ -22,6 +22,7 @@ class KwTextField extends StatefulWidget {
     this.onSubmitted,
     this.errorText,
     this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
     this.enabled = true,
   });
 
@@ -36,6 +37,11 @@ class KwTextField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final String? errorText;
   final TextInputAction? textInputAction;
+
+  /// Worth setting for names (`words`) and addresses (`sentences`) — the OS
+  /// keyboard does the shifting so the user does not have to.
+  final TextCapitalization textCapitalization;
+
   final bool enabled;
 
   @override
@@ -102,6 +108,7 @@ class _KwTextFieldState extends State<KwTextField> {
                   onChanged: widget.onChanged,
                   onSubmitted: widget.onSubmitted,
                   textInputAction: widget.textInputAction,
+                  textCapitalization: widget.textCapitalization,
                   style: AppType.bodyStrong.copyWith(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
@@ -235,6 +242,33 @@ class KwSearchBar extends StatelessWidget {
           ?trailing,
         ],
       ),
+    );
+  }
+}
+
+/// Formats a 10-digit Indian mobile as `98765 43210` while typing.
+///
+/// Lives here rather than on a screen because both Login and Register need the
+/// same phone field, and two copies would drift.
+class PhoneSpaceFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return newValue.copyWith(text: '');
+
+    final buffer = StringBuffer();
+    for (var i = 0; i < digits.length && i < 10; i++) {
+      if (i == 5) buffer.write(' ');
+      buffer.write(digits[i]);
+    }
+    final text = buffer.toString();
+
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

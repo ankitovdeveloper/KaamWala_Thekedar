@@ -21,7 +21,10 @@ class LabourFilters {
   const LabourFilters({
     this.skillId,
     this.maxRate = _rateCeiling,
-    this.availableOnly = false,
+    // On by default: a search that offers workers who are off duty right now
+    // wastes the Thekedar's time, so the useful list is the starting point and
+    // seeing everyone is the deliberate step.
+    this.availableOnly = true,
     this.radiusKm = ApiConfig.defaultRadiusKm,
     this.sort = LabourSort.distance,
   });
@@ -40,14 +43,14 @@ class LabourFilters {
   bool get isDefault =>
       skillId == null &&
       maxRate >= _rateCeiling &&
-      !availableOnly &&
+      availableOnly &&
       radiusKm == ApiConfig.defaultRadiusKm;
 
   /// Count shown on the Filter button's badge.
   int get activeCount =>
       (skillId != null ? 1 : 0) +
       (maxRate < _rateCeiling ? 1 : 0) +
-      (availableOnly ? 1 : 0) +
+      (availableOnly ? 0 : 1) +
       (radiusKm != ApiConfig.defaultRadiusKm ? 1 : 0);
 
   LabourFilters copyWith({

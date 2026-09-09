@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/models.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/otp_screen.dart';
+import '../../features/auth/register_screen.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/booking_detail/booking_detail_screen.dart';
 import '../../features/labour_detail/labour_detail_screen.dart';
@@ -16,6 +17,11 @@ abstract final class Routes {
   /// [home] or [login]. Nothing else should navigate here.
   static const splash = '/';
   static const login = '/login';
+
+  /// Sign-up. Pushed on top of [login] rather than replacing it, so "already
+  /// have an account?" is a pop instead of a second Login route.
+  static const register = '/register';
+
   static const otp = '/otp';
   static const home = '/home';
   static const laboursMap = '/labours-map';
@@ -31,6 +37,7 @@ abstract final class Routes {
       switch (settings.name) {
         splash => _fade(const SplashScreen(), settings),
         login => _fade(const LoginScreen(), settings),
+        register => _slideUp(const RegisterScreen(), settings),
         otp => _slideUp(
           OtpScreen(args: settings.arguments as OtpArgs),
           settings,

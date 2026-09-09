@@ -14,14 +14,30 @@ abstract interface class KaamWalaRepository {
   /// `POST /auth/send-otp`
   Future<OtpChallenge> sendOtp({required String phone, String countryCode});
 
+  /// `POST /auth/register` — sign-up step one.
+  ///
+  /// Refuses a number that already has an account (422), which is the whole
+  /// difference from [sendOtp]. The details in [draft] are only *validated*
+  /// here; the account does not exist until [verifyOtp] proves the number, so
+  /// the same draft has to be replayed on that call.
+  Future<OtpChallenge> register({
+    required SignupDraft draft,
+    String countryCode,
+  });
+
   /// `POST /auth/resend-otp`
   Future<OtpChallenge> resendOtp({required String phone, String countryCode});
 
   /// `POST /auth/verify-otp` — issues the Sanctum token.
+  ///
+  /// Pass [draft] for the sign-up flow: it sends `purpose=register` along with
+  /// the details typed on the Register screen, which the server writes onto the
+  /// account it creates. Omit it and this is an ordinary login.
   Future<AuthResult> verifyOtp({
     required String phone,
     required String otp,
     String countryCode,
+    SignupDraft? draft,
   });
 
   /// `POST /auth/logout`

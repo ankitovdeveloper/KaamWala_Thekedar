@@ -680,6 +680,14 @@ class Booking {
   bool get isTrackable =>
       status == BookingStatus.accepted && jobStage != JobStage.completed;
 
+  /// True while this booking is still the *worker's* to move — either they have
+  /// not answered the request yet, or they have and the kaam is not finished.
+  ///
+  /// What decides whether a screen showing this row keeps re-reading it: both
+  /// of those states change with nothing happening in this app at all, and a
+  /// refused, cancelled or finished booking never changes again.
+  bool get isLive => status == BookingStatus.pending || isTrackable;
+
   /// True while this Thekedar could still call the kaam finished.
   bool get canComplete => status == BookingStatus.accepted;
 
@@ -1668,6 +1676,41 @@ class AuthResult {
     isNewUser: json.flag('is_new_user'),
     isProfileComplete: json.flag('is_profile_complete'),
   );
+}
+
+/// The details typed on the Register screen, held between `/auth/register` and
+/// `/auth/verify-otp`.
+///
+/// The account only comes into existence once the OTP is verified, so these
+/// have to be replayed on that second call — the server writes them onto the
+/// row it creates. Keeping them in one object is what stops the OTP screen from
+/// growing four more constructor arguments it does nothing with.
+@immutable
+class SignupDraft {
+  const SignupDraft({
+    required this.name,
+    required this.phone,
+    required this.address,
+    this.email = '',
+  });
+
+  final String name;
+
+  /// Bare digits — the format the API expects.
+  final String phone;
+
+  final String address;
+
+  /// Optional; empty means "not given" and is omitted from the request.
+  final String email;
+
+  /// The sign-up fields as the API names them, with the blanks left out so a
+  /// `nullable` validator sees an absent key rather than an empty string.
+  Map<String, Object?> toJson() => {
+    'name': name,
+    if (address.isNotEmpty) 'address': address,
+    if (email.isNotEmpty) 'email': email,
+  };
 }
 
 /// `POST /auth/send-otp` — the debug build echoes the code back.

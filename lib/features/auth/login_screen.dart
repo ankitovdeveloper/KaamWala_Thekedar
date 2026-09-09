@@ -154,21 +154,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         delay: const Duration(milliseconds: 450),
                         child: _registerLine(),
                       ),
-                      Gap.v20,
-                      FadeSlideIn(
-                        delay: const Duration(milliseconds: 500),
-                        child: _divider(),
-                      ),
-                      Gap.v20,
-                      FadeSlideIn(
-                        delay: const Duration(milliseconds: 550),
-                        child: KwButton(
-                          label: s.googleLogin,
-                          icon: Icons.g_mobiledata_rounded,
-                          variant: KwButtonVariant.outline,
-                          onPressed: () => _todo(context, s.googleSignIn),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -293,7 +278,7 @@ class _LoginScreenState extends State<LoginScreen> {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')),
               LengthLimitingTextInputFormatter(11),
-              _PhoneSpaceFormatter(),
+              PhoneSpaceFormatter(),
             ],
             onChanged: (_) {
               if (_error != null) setState(() => _error = null);
@@ -324,7 +309,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Text(s.newUserPrompt, style: AppType.caption.copyWith(fontSize: 13)),
         Pressable(
           scale: 0.94,
-          onTap: () => _todo(context, s.registration),
+          onTap: () => Navigator.of(context).pushNamed(Routes.register),
           child: Text(
             s.register,
             style: AppType.bodyStrong.copyWith(
@@ -336,47 +321,5 @@ class _LoginScreenState extends State<LoginScreen> {
       ],
     );
   }
-
-  Widget _divider() {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Gap.lg),
-          child: Text(context.s.or, style: AppType.caption),
-        ),
-        const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
-      ],
-    );
-  }
-
-  static void _todo(BuildContext context, String what) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(context.s.comingSoon(what))));
-  }
 }
 
-/// Formats a 10-digit Indian mobile as `98765 43210` while typing.
-class _PhoneSpaceFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.isEmpty) return newValue.copyWith(text: '');
-
-    final buffer = StringBuffer();
-    for (var i = 0; i < digits.length && i < 10; i++) {
-      if (i == 5) buffer.write(' ');
-      buffer.write(digits[i]);
-    }
-    final text = buffer.toString();
-
-    return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-  }
-}

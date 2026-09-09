@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/animations/celebration.dart';
 import '../../core/animations/effects.dart';
 import '../../core/animations/entrance.dart';
 import '../../core/animations/pressable.dart';
+import '../../core/audio/app_sounds.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
@@ -13,6 +15,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_typography.dart';
 import '../../data/api/api_exception.dart';
+import '../../data/models/models.dart';
 import '../../data/session.dart';
 import '../../widgets/kw_async.dart';
 import '../../widgets/kw_button.dart';
@@ -25,6 +28,7 @@ class OtpArgs {
     this.countryCode = '+91',
     this.resendIn = 30,
     this.debugCode,
+    this.draft,
   });
 
   /// Bare digits — the format the API expects back on verify.
@@ -36,6 +40,15 @@ class OtpArgs {
 
   /// Debug builds echo the code back; we prefill it so QA isn't hunting logs.
   final String? debugCode;
+
+  /// Non-null when this OTP came from the Register screen. It carries the
+  /// details typed there through to `verify-otp`, which is what actually
+  /// creates the account — so without it a sign-up would land on a blank
+  /// profile and ask for everything again.
+  final SignupDraft? draft;
+
+  /// Whether this is the sign-up flow rather than a login.
+  bool get isSignup => draft != null;
 }
 
 /// Six-box OTP entry backed by `POST /v1/auth/verify-otp`.
@@ -165,23 +178,27 @@ class _OtpScreenState extends State<OtpScreen> {
 
     try {
       // POST /v1/auth/verify-otp — creates the account on first login and
-      // returns the Sanctum token.
+      // returns the Sanctum token. On the sign-up path the draft goes with it,
+      // so the row is created with the name/address/email already filled in.
       final result = await session.repo.verifyOtp(
         phone: widget.args.phone,
         otp: _code,
         countryCode: widget.args.countryCode,
+        draft: widget.args.draft,
       );
       await session.signIn(result);
       if (!mounted) return;
 
       HapticFeedback.mediumImpact();
+      AppSounds.success();
       setState(() {
         _busy = false;
         _verified = true;
       });
 
-      // Let the tick finish drawing before leaving.
-      await Future<void>.delayed(const Duration(milliseconds: 850));
+      // Long enough for the tick to draw and the paper to get airborne. Any
+      // shorter and the celebration is a flash on the way out of the screen.
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
       if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil(Routes.home, (_) => false);
     } on Object catch (e) {
@@ -316,7 +333,9 @@ class _OtpScreenState extends State<OtpScreen> {
                     FadeSlideIn(
                       delay: const Duration(milliseconds: 300),
                       child: KwButton(
-                        label: s.otpVerify,
+                        label: widget.args.isSignup
+                            ? s.otpVerifySignup
+                            : s.otpVerify,
                         icon: Icons.verified_user_rounded,
                         busy: _busy,
                         succeeded: _verified,
@@ -332,7 +351,9 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
               ),
             ),
-            // Success overlay — dims the form and draws a tick before routing.
+            // Success overlay — dims the form and draws the tick before routing.
+            // Full screen rather than the celebration popup: there is nothing
+            // to dismiss here, the app is already on its way to the home tab.
             IgnorePointer(
               child: AnimatedOpacity(
                 duration: Motion.normal,
@@ -341,14 +362,32 @@ class _OtpScreenState extends State<OtpScreen> {
                   color: AppColors.canvas.withValues(alpha: 0.86),
                   child: SizedBox.expand(
                     child: _verified
-                        ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        ? Stack(
+                            // The column shrink-wraps to the width of the line
+                            // it holds, and a Stack parks a loose child in the
+                            // top-start corner — which left "Login ho gaya!"
+                            // pinned to the left edge under a centred tick.
+                            // Centring the Stack is what puts the words back
+                            // under the burst.
+                            alignment: Alignment.center,
                             children: [
-                              const DrawnCheck(size: 72),
-                              Gap.v20,
-                              FadeSlideIn(
-                                delay: const Duration(milliseconds: 260),
-                                child: Text(s.otpLoggedIn, style: AppType.h3),
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const SuccessBurst(size: 108),
+                                  Gap.v20,
+                                  FadeSlideIn(
+                                    delay: const Duration(milliseconds: 260),
+                                    child: Text(
+                                      s.otpLoggedIn,
+                                      textAlign: TextAlign.center,
+                                      style: AppType.h3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Positioned.fill(
+                                child: Confetti(origin: Alignment(0, -0.15)),
                               ),
                             ],
                           )

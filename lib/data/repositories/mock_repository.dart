@@ -42,6 +42,30 @@ class MockRepository implements KaamWalaRepository {
   );
 
   @override
+  Future<OtpChallenge> register({
+    required SignupDraft draft,
+    String countryCode = '+91',
+  }) async {
+    await _delayed(null);
+    // Mirrors the server's one refusal, so the Register screen's "already
+    // registered, go and log in" path is reachable with nothing running.
+    if (draft.phone == _user.phone) {
+      throw const ApiException(
+        'Ye number pehle se registered hai. Login karein.',
+        statusCode: 422,
+        fieldErrors: {
+          'phone': ['Phone number already registered.'],
+        },
+      );
+    }
+    return OtpChallenge(
+      phone: draft.phone,
+      countryCode: countryCode,
+      debugCode: '123456',
+    );
+  }
+
+  @override
   Future<OtpChallenge> resendOtp({
     required String phone,
     String countryCode = '+91',
@@ -52,6 +76,7 @@ class MockRepository implements KaamWalaRepository {
     required String phone,
     required String otp,
     String countryCode = '+91',
+    SignupDraft? draft,
   }) async {
     await _delayed(null);
     // Mirrors the server's rejection path so the error UI is reachable offline.
@@ -60,7 +85,22 @@ class MockRepository implements KaamWalaRepository {
     }
     return AuthResult(
       token: 'mock-token',
-      user: _user,
+      // A sign-up lands on the account it just described, not on the seeded
+      // demo user — otherwise the Register screen appears to discard the form.
+      // Built rather than `copyWith`ed because `phone` is fixed on a copy.
+      user: draft == null
+          ? _user
+          : AppUser(
+              id: _user.id,
+              name: draft.name,
+              phone: draft.phone,
+              countryCode: countryCode,
+              email: draft.email.isEmpty ? null : draft.email,
+              address: draft.address,
+              language: _user.language,
+              isProfileComplete: true,
+            ),
+      isNewUser: draft != null,
       isProfileComplete: true,
     );
   }

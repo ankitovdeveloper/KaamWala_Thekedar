@@ -36,6 +36,23 @@ class ApiRepository implements KaamWalaRepository {
   }
 
   @override
+  Future<OtpChallenge> register({
+    required SignupDraft draft,
+    String countryCode = '+91',
+  }) async {
+    final data = await _api.post(
+      'auth/register',
+      body: {
+        'phone': draft.phone,
+        'country_code': countryCode,
+        'role': ApiConfig.role,
+        ...draft.toJson(),
+      },
+    );
+    return OtpChallenge.fromJson(_obj(data));
+  }
+
+  @override
   Future<OtpChallenge> resendOtp({
     required String phone,
     String countryCode = '+91',
@@ -56,6 +73,7 @@ class ApiRepository implements KaamWalaRepository {
     required String phone,
     required String otp,
     String countryCode = '+91',
+    SignupDraft? draft,
   }) async {
     final data = await _api.post(
       'auth/verify-otp',
@@ -64,6 +82,10 @@ class ApiRepository implements KaamWalaRepository {
         'otp': otp,
         'country_code': countryCode,
         'role': ApiConfig.role,
+        // `purpose` is what makes the server treat this as a sign-up: it
+        // requires the OTP to have come from `/auth/register` and refuses a
+        // number that has been claimed in the meantime.
+        if (draft != null) ...{'purpose': 'register', ...draft.toJson()},
       },
     );
     return AuthResult.fromJson(_obj(data));

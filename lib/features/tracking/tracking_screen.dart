@@ -12,6 +12,7 @@ import '../../data/models/models.dart';
 import '../../data/session.dart';
 import '../../widgets/kw_async.dart';
 import '../../widgets/kw_button.dart';
+import '../../widgets/kw_celebration.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
 import 'widgets/arrival_sheet.dart';
@@ -36,19 +37,59 @@ class TrackingScreen extends StatefulWidget {
 class _TrackingScreenState extends State<TrackingScreen> {
   late final TrackingSession _session;
 
+  /// Set once the accept has been dealt with, either by announcing it or by
+  /// deciding it was already old news when the screen opened.
+  bool _acceptSettled = false;
+
   @override
   void initState() {
     super.initState();
     _session = TrackingSession(
       repository: context.repo,
       bookingId: widget.booking.id,
-    )..start();
+    )
+      ..addListener(_watchForAccept)
+      ..start();
   }
 
   @override
   void dispose() {
+    _session.removeListener(_watchForAccept);
     _session.dispose();
     super.dispose();
+  }
+
+  /// The worker saying yes is the one event on this screen nobody taps for — it
+  /// lands on a poll while the Thekedar is watching a spinner, and until now the
+  /// only sign of it was the spinner quietly turning into a map.
+  ///
+  /// Announced strictly on the *change*: arriving at a booking that was accepted
+  /// an hour ago is not news, and celebrating it would teach people to ignore
+  /// the popup that matters.
+  void _watchForAccept() {
+    if (_acceptSettled) return;
+
+    final latest = _session.latest;
+    if (latest == null || !latest.accepted) return;
+
+    // Either way the question is now closed for this screen.
+    _acceptSettled = true;
+
+    final previous = _session.previous;
+    if (previous == null || previous.accepted) return;
+    if (!mounted) return;
+
+    // Out of the poll's own callback: showing a route from inside a listener
+    // works, but scheduling it keeps the navigation off the notify path.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final s = context.s;
+      KwCelebration.show(
+        context,
+        title: s.celebrateAcceptedTitle(widget.booking.labour.name),
+        message: s.celebrateAcceptedBody,
+      );
+    });
   }
 
   @override
@@ -304,7 +345,17 @@ class _TrackingScreenState extends State<TrackingScreen> {
       gpsArrived: update.arrivedAt != null,
     );
 
-    if (started == true) await _session.refresh();
+    if (started != true) return;
+
+    await _session.refresh();
+    if (!mounted) return;
+
+    final s = context.s;
+    await KwCelebration.show(
+      context,
+      title: s.celebrateWorkStartedTitle,
+      message: s.celebrateWorkStartedBody(widget.booking.labour.name),
+    );
   }
 
   /// Marks the kaam finished from here, behind a confirm: it ends the job for
@@ -347,8 +398,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
     try {
       await context.repo.completeBooking(widget.booking.id);
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(s.workDoneMarked)));
       await _session.refresh();
+      if (!mounted) return;
+      await KwCelebration.show(
+        context,
+        title: s.celebrateWorkDoneTitle,
+        message: s.celebrateWorkDoneBody(widget.booking.labour.name),
+      );
     } on Object catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text(describeError(context, e))));

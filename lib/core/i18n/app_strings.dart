@@ -83,11 +83,26 @@ class AppStrings {
   String get termsLine =>
       'Aage badhne ka matlab hai aap Terms aur Privacy Policy se sehmat hain';
 
+  // ── Register ──────────────────────────────────────────────────────────────
+
+  String get registerWelcome => 'Account banayein 🧰';
+  String get registerSubtitle =>
+      'Basic details bharein, number verify karein — phir kaam wale dhoondhna shuru';
+  String get registerAddressHint => 'Ghar ya site ka address';
+  String get registerAddressRequired => 'Apna address daalein';
+  String get registerSubmit => 'Aage badhein';
+  String get haveAccountPrompt => 'Pehle se account hai? ';
+  String get loginInstead => 'Login karein';
+  String get phoneTaken => 'Ye number pehle se registered hai. Login karein.';
+
   // ── OTP ───────────────────────────────────────────────────────────────────
 
   String get otpTitle => 'OTP Verify karein';
   String get otpSentLine => '6-digit code bheja gaya hai';
   String get otpVerify => 'Verify & Login';
+
+  /// The same box finishes a sign-up, where "Login" would be the wrong verb.
+  String get otpVerifySignup => 'Verify & Account banayein';
   String get otpResend => 'Dobara OTP bhejein';
   String get otpResendIn => 'Resend in ';
   String get otpResent => 'Naya OTP bhej diya';
@@ -310,6 +325,11 @@ class AppStrings {
   String get workStarted => 'Kaam shuru ho gaya';
   String get workFinished => 'Kaam poora hua';
   String get onTheWay => 'Raaste mein';
+
+  /// Said out loud the moment a worker sets off. Nobody taps for this one — it
+  /// lands on a poll while the Thekedar is just looking at the list — so
+  /// without a line the only sign of it is a strip quietly moving one notch.
+  String labourOnTheWay(String name) => '$name site ke liye nikal gaya';
   String get almostThere => 'Bas pahunchne wala hai';
   String minutesAway(int minutes) => '$minutes min door';
   String get trackingStalled =>
@@ -390,6 +410,48 @@ class AppStrings {
   String awaitingLabourConfirm(String name) => '$name ke confirm ka intezaar';
   String labourConfirmed(String name) => '$name ne confirm kar diya';
   String labourDisputed(String name) => '$name ne aapatti darj ki';
+
+  // ── Success celebrations ──────────────────────────────────────────────────
+  // The handful of moments the whole booking exists for. A snackbar used to
+  // carry these, and a snackbar cannot tell "address save ho gaya" apart from
+  // "kaam wale ne haan kar di" — so these get the popup with the tick, the
+  // paper and the chime instead.
+  String get celebrateOk => 'Theek hai';
+  String get celebrateTrack => 'Live tracking dekhein';
+
+  String celebrateAcceptedTitle(String name) => '$name ne haan kar di!';
+  String get celebrateAcceptedBody =>
+      'Wo kaam ki jagah ke liye nikal rahe hain. Live location ab map par dikhegi.';
+
+  String get celebrateRequestSentTitle => 'Request bhej di!';
+  String celebrateRequestSentBody(String name) =>
+      '$name ke paas request pahunch gayi. Unke jawab ka intezaar hai.';
+
+  String get celebrateWorkStartedTitle => 'Kaam shuru ho gaya!';
+  String celebrateWorkStartedBody(String name) =>
+      'Code sahi tha — $name ka kaam ab chalu hai.';
+
+  String get celebrateWorkDoneTitle => 'Kaam poora ho gaya!';
+  String celebrateWorkDoneBody(String name) =>
+      'Aapne kaam poora mark kar diya. Ab $name se confirm karne ko kaha gaya hai.';
+
+  String get celebratePaymentTitle => 'Payment ho gaya!';
+  String celebratePaymentBody(String name) =>
+      'Paisa dena record ho gaya. Ab $name se confirm karne ko kaha gaya hai.';
+
+  String celebratePaymentConfirmedTitle(String name) =>
+      '$name ne payment confirm kar di!';
+  String get celebratePaymentConfirmedBody =>
+      'Paisa unhe mil gaya. Ye booking ab dono taraf se poori hai.';
+
+  String celebrateLabourAgreedTitle(String name) =>
+      '$name ne kaam poora maan liya!';
+  String get celebrateLabourAgreedBody =>
+      'Kaam par dono raazi hain. Bas payment ka hisaab baaki hai.';
+
+  String get celebrateReviewTitle => 'Review de diya!';
+  String celebrateReviewBody(String name) =>
+      'Aapki raay se dusre thekedaron ko $name ko chunne mein madad milegi.';
 
   // ── Booking detail (the step-by-step record of one booking) ───────────────
   // The step titles are localised from the server's `code`, not shown as it
@@ -646,11 +708,31 @@ class _Hindi extends AppStrings {
       'आगे बढ़ने का मतलब है आप Terms और Privacy Policy से सहमत हैं';
 
   @override
+  String get registerWelcome => 'खाता बनाएँ 🧰';
+  @override
+  String get registerSubtitle =>
+      'बुनियादी जानकारी भरें, नंबर वेरिफ़ाई करें — फिर कारीगर ढूँढना शुरू';
+  @override
+  String get registerAddressHint => 'घर या साइट का पता';
+  @override
+  String get registerAddressRequired => 'अपना पता डालें';
+  @override
+  String get registerSubmit => 'आगे बढ़ें';
+  @override
+  String get haveAccountPrompt => 'पहले से खाता है? ';
+  @override
+  String get loginInstead => 'लॉगिन करें';
+  @override
+  String get phoneTaken => 'यह नंबर पहले से रजिस्टर्ड है। लॉगिन करें।';
+
+  @override
   String get otpTitle => 'OTP वेरिफ़ाई करें';
   @override
   String get otpSentLine => '6 अंकों का कोड भेजा गया है';
   @override
   String get otpVerify => 'वेरिफ़ाई और लॉगिन';
+  @override
+  String get otpVerifySignup => 'वेरिफ़ाई और खाता बनाएँ';
   @override
   String get otpResend => 'दोबारा OTP भेजें';
   @override
@@ -1003,6 +1085,8 @@ class _Hindi extends AppStrings {
   @override
   String get onTheWay => 'रास्ते में';
   @override
+  String labourOnTheWay(String name) => '$name साइट के लिए निकल गया';
+  @override
   String get almostThere => 'बस पहुँचने वाले हैं';
   @override
   String minutesAway(int minutes) => '$minutes मिनट दूर';
@@ -1123,6 +1207,53 @@ class _Hindi extends AppStrings {
   String labourConfirmed(String name) => '$name ने कन्फर्म कर दिया';
   @override
   String labourDisputed(String name) => '$name ने आपत्ति दर्ज की';
+
+  @override
+  String get celebrateOk => 'ठीक है';
+  @override
+  String get celebrateTrack => 'लाइव ट्रैकिंग देखें';
+  @override
+  String celebrateAcceptedTitle(String name) => '$name ने हाँ कर दी!';
+  @override
+  String get celebrateAcceptedBody =>
+      'वो काम की जगह के लिए निकल रहे हैं। लाइव लोकेशन अब मैप पर दिखेगी।';
+  @override
+  String get celebrateRequestSentTitle => 'रिक्वेस्ट भेज दी!';
+  @override
+  String celebrateRequestSentBody(String name) =>
+      '$name के पास रिक्वेस्ट पहुँच गई। उनके जवाब का इंतज़ार है।';
+  @override
+  String get celebrateWorkStartedTitle => 'काम शुरू हो गया!';
+  @override
+  String celebrateWorkStartedBody(String name) =>
+      'कोड सही था — $name का काम अब चालू है।';
+  @override
+  String get celebrateWorkDoneTitle => 'काम पूरा हो गया!';
+  @override
+  String celebrateWorkDoneBody(String name) =>
+      'आपने काम पूरा मार्क कर दिया। अब $name से कन्फर्म करने को कहा गया है।';
+  @override
+  String get celebratePaymentTitle => 'पेमेंट हो गया!';
+  @override
+  String celebratePaymentBody(String name) =>
+      'पैसा देना रिकॉर्ड हो गया। अब $name से कन्फर्म करने को कहा गया है।';
+  @override
+  String celebratePaymentConfirmedTitle(String name) =>
+      '$name ने पेमेंट कन्फर्म कर दी!';
+  @override
+  String get celebratePaymentConfirmedBody =>
+      'पैसा उन्हें मिल गया। ये बुकिंग अब दोनों तरफ से पूरी है।';
+  @override
+  String celebrateLabourAgreedTitle(String name) =>
+      '$name ने काम पूरा मान लिया!';
+  @override
+  String get celebrateLabourAgreedBody =>
+      'काम पर दोनों राज़ी हैं। बस पेमेंट का हिसाब बाकी है।';
+  @override
+  String get celebrateReviewTitle => 'रिव्यू दे दिया!';
+  @override
+  String celebrateReviewBody(String name) =>
+      'आपकी राय से दूसरे ठेकेदारों को $name को चुनने में मदद मिलेगी।';
 
   @override
   String get bookingDetailTitle => 'बुकिंग की पूरी जानकारी';
@@ -1491,11 +1622,32 @@ class _English extends AppStrings {
       'By continuing you agree to our Terms and Privacy Policy';
 
   @override
+  String get registerWelcome => 'Create your account 🧰';
+  @override
+  String get registerSubtitle =>
+      'A few basic details, verify your number, and you can start finding workers';
+  @override
+  String get registerAddressHint => 'Home or site address';
+  @override
+  String get registerAddressRequired => 'Enter your address';
+  @override
+  String get registerSubmit => 'Continue';
+  @override
+  String get haveAccountPrompt => 'Already have an account? ';
+  @override
+  String get loginInstead => 'Log in';
+  @override
+  String get phoneTaken =>
+      'This number is already registered. Please log in instead.';
+
+  @override
   String get otpTitle => 'Verify OTP';
   @override
   String get otpSentLine => 'We sent a 6-digit code to';
   @override
   String get otpVerify => 'Verify & Login';
+  @override
+  String get otpVerifySignup => 'Verify & create account';
   @override
   String get otpResend => 'Resend OTP';
   @override
@@ -1818,6 +1970,8 @@ class _English extends AppStrings {
   @override
   String get onTheWay => 'On the way';
   @override
+  String labourOnTheWay(String name) => '$name has set off for the site';
+  @override
   String get almostThere => 'Almost there';
   @override
   String minutesAway(int minutes) => '$minutes min away';
@@ -1938,6 +2092,53 @@ class _English extends AppStrings {
   String labourConfirmed(String name) => '$name confirmed it';
   @override
   String labourDisputed(String name) => '$name disputed it';
+
+  @override
+  String get celebrateOk => 'Got it';
+  @override
+  String get celebrateTrack => 'Track them live';
+  @override
+  String celebrateAcceptedTitle(String name) => '$name said yes!';
+  @override
+  String get celebrateAcceptedBody =>
+      'They are setting off for the site. Their live location now shows on the map.';
+  @override
+  String get celebrateRequestSentTitle => 'Request sent!';
+  @override
+  String celebrateRequestSentBody(String name) =>
+      'It has reached $name. You will know here the moment they answer.';
+  @override
+  String get celebrateWorkStartedTitle => 'The work has started!';
+  @override
+  String celebrateWorkStartedBody(String name) =>
+      'The code checked out — $name is on the job now.';
+  @override
+  String get celebrateWorkDoneTitle => 'Work complete!';
+  @override
+  String celebrateWorkDoneBody(String name) =>
+      'You have marked the work finished. $name has been asked to confirm it.';
+  @override
+  String get celebratePaymentTitle => 'Payment done!';
+  @override
+  String celebratePaymentBody(String name) =>
+      'The payment is on the record. $name has been asked to confirm it arrived.';
+  @override
+  String celebratePaymentConfirmedTitle(String name) =>
+      '$name confirmed the payment!';
+  @override
+  String get celebratePaymentConfirmedBody =>
+      'The money reached them. This booking is now settled on both sides.';
+  @override
+  String celebrateLabourAgreedTitle(String name) =>
+      '$name agreed the work is done!';
+  @override
+  String get celebrateLabourAgreedBody =>
+      'You both agree the kaam is finished. Only the money is left to settle.';
+  @override
+  String get celebrateReviewTitle => 'Review sent!';
+  @override
+  String celebrateReviewBody(String name) =>
+      'Your word helps the next Thekedar decide whether to book $name.';
 
   @override
   String get bookingDetailTitle => 'Booking details';
@@ -2298,11 +2499,31 @@ class _Bhojpuri extends _Hindi {
   String get googleLogin => 'Google से लॉगिन करीं';
 
   @override
+  String get registerWelcome => 'खाता बनाईं 🧰';
+  @override
+  String get registerSubtitle =>
+      'थोड़ी जानकारी भरीं, नंबर वेरिफ़ाई करीं — फेर कारीगर खोजल सुरू';
+  @override
+  String get registerAddressHint => 'घर भा साइट के पता';
+  @override
+  String get registerAddressRequired => 'आपन पता डालीं';
+  @override
+  String get registerSubmit => 'आगे बढ़ीं';
+  @override
+  String get haveAccountPrompt => 'पहिले से खाता बा? ';
+  @override
+  String get loginInstead => 'लॉगिन करीं';
+  @override
+  String get phoneTaken => 'ई नंबर पहिले से रजिस्टर बा। लॉगिन करीं।';
+
+  @override
   String get otpTitle => 'OTP वेरिफ़ाई करीं';
   @override
   String get otpSentLine => '6 अंक के कोड भेजल गइल बा';
   @override
   String get otpVerify => 'वेरिफ़ाई आ लॉगिन';
+  @override
+  String get otpVerifySignup => 'वेरिफ़ाई आ खाता बनाईं';
   @override
   String get otpResend => 'फेर से OTP भेजीं';
   @override
@@ -2533,6 +2754,8 @@ class _Bhojpuri extends _Hindi {
   @override
   String get onTheWay => 'रस्ता में';
   @override
+  String labourOnTheWay(String name) => '$name साइट खातिर निकल गइलन';
+  @override
   String get almostThere => 'बस पहुँचे वाला बाड़न';
   @override
   String minutesAway(int minutes) => '$minutes मिनट दूर';
@@ -2590,6 +2813,53 @@ class _Bhojpuri extends _Hindi {
   String labourConfirmed(String name) => '$name कन्फर्म कर देहलन';
   @override
   String labourDisputed(String name) => '$name आपत्ति दर्ज कइलन';
+
+  @override
+  String get celebrateOk => 'ठीक बा';
+  @override
+  String get celebrateTrack => 'लाइव ट्रैकिंग देखीं';
+  @override
+  String celebrateAcceptedTitle(String name) => '$name हाँ कह देलन!';
+  @override
+  String get celebrateAcceptedBody =>
+      'उ काम के जगह खातिर निकल रहल बाड़न। लाइव लोकेशन अब मैप पर लउकी।';
+  @override
+  String get celebrateRequestSentTitle => 'रिक्वेस्ट भेज देले बानी!';
+  @override
+  String celebrateRequestSentBody(String name) =>
+      '$name लगे रिक्वेस्ट पहुँच गइल। उनकर जवाब के इंतज़ार बा।';
+  @override
+  String get celebrateWorkStartedTitle => 'काम शुरू हो गइल!';
+  @override
+  String celebrateWorkStartedBody(String name) =>
+      'कोड सही रहे — $name के काम अब चालू बा।';
+  @override
+  String get celebrateWorkDoneTitle => 'काम पूरा हो गइल!';
+  @override
+  String celebrateWorkDoneBody(String name) =>
+      'रउआ काम पूरा मार्क कर देहनी। अब $name से कन्फर्म करे के कहल गइल बा।';
+  @override
+  String get celebratePaymentTitle => 'पेमेंट हो गइल!';
+  @override
+  String celebratePaymentBody(String name) =>
+      'पइसा देवे के रिकॉर्ड हो गइल। अब $name से कन्फर्म करे के कहल गइल बा।';
+  @override
+  String celebratePaymentConfirmedTitle(String name) =>
+      '$name पेमेंट कन्फर्म कर देलन!';
+  @override
+  String get celebratePaymentConfirmedBody =>
+      'पइसा उनका मिल गइल। ई बुकिंग अब दुनो ओर से पूरा बा।';
+  @override
+  String celebrateLabourAgreedTitle(String name) =>
+      '$name काम पूरा मान लेलन!';
+  @override
+  String get celebrateLabourAgreedBody =>
+      'काम पर दुनो राज़ी बानी। बस पेमेंट के हिसाब बाकी बा।';
+  @override
+  String get celebrateReviewTitle => 'रिव्यू दे देले बानी!';
+  @override
+  String celebrateReviewBody(String name) =>
+      'रउआ के राय से दोसर ठेकेदारन के $name के चुने में मदद मिली।';
 
   @override
   String get bookingDetailTitle => 'बुकिंग के पूरा जानकारी';

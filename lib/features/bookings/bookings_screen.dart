@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/animations/entrance.dart';
+import '../../core/async/live_poll.dart';
 import '../../core/async/loadable.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/router/routes.dart';
@@ -8,10 +9,12 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_typography.dart';
+import '../../data/api/api_config.dart';
 import '../../data/models/models.dart';
 import '../../data/repositories/kaamwala_repository.dart';
 import '../../data/session.dart';
 import '../../widgets/kw_async.dart';
+import '../../widgets/kw_celebration.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
 import '../shell/home_shell.dart';
@@ -39,6 +42,16 @@ class _BookingsScreenState extends State<BookingsScreen>
     () => context.repo.bookings(tab: _tab.wire),
   );
 
+  /// Keeps the rows honest while somebody is looking at them. The stage strip
+  /// on an accepted card is moved by the worker's phone, not by anything that
+  /// happens here, so without this the card sits on "Pending" until the app is
+  /// backgrounded and reopened — which is not how anybody waits for a labour
+  /// to set off.
+  late final LivePoll _live = LivePoll(
+    onTick: _pollLive,
+    interval: ApiConfig.stagePollInterval,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +59,9 @@ class _BookingsScreenState extends State<BookingsScreen>
     // refuses, or walks off, and none of it reaches this screen on its own.
     // Coming back to the app is the moment to find out.
     WidgetsBinding.instance.addObserver(this);
+    // ...and while the app *is* open, the timer is. Synced off the loaded rows
+    // so it only runs while one of them is still live.
+    _bookings.addListener(_syncLive);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _bookings.load();
     });
@@ -54,6 +70,8 @@ class _BookingsScreenState extends State<BookingsScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _live.dispose();
+    _bookings.removeListener(_syncLive);
     _bookings.dispose();
     super.dispose();
   }
@@ -61,7 +79,35 @@ class _BookingsScreenState extends State<BookingsScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Silent: the rows already on screen stay up while the new ones land.
-    if (state == AppLifecycleState.resumed) _bookings.load(silent: true);
+    if (state == AppLifecycleState.resumed) {
+      _live.resume();
+      _bookings.load(silent: true);
+    } else {
+      _live.pause();
+    }
+  }
+
+  /// Runs the timer for exactly as long as a row can still move on its own.
+  void _syncLive() => _live.sync(wanted: _rows.any((b) => b.isLive));
+
+  /// One tick: refetch quietly, then say so if a worker set off while the
+  /// Thekedar was watching the list.
+  Future<void> _pollLive() async {
+    final before = {for (final b in _rows) b.id: b.jobStage};
+    await _bookings.load(silent: true);
+    if (!mounted) return;
+
+    // Only the screen on top gets to interrupt, and only the first departure —
+    // a queue of these would bury the one that just happened.
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+
+    for (final booking in _rows) {
+      if (before[booking.id] == JobStage.pending &&
+          booking.jobStage == JobStage.onTheWay) {
+        _toast(context.s.labourOnTheWay(booking.labour.name));
+        return;
+      }
+    }
   }
 
   void _selectTab(BookingTab tab) {
@@ -144,8 +190,15 @@ class _BookingsScreenState extends State<BookingsScreen>
         s.yesWorkDone)) {
       return;
     }
-    await _apply(booking, (repo) => repo.completeBooking(booking.id),
-        s.workDoneMarked);
+    await _apply(
+      booking,
+      (repo) => repo.completeBooking(booking.id),
+      () => KwCelebration.show(
+        context,
+        title: s.celebrateWorkDoneTitle,
+        message: s.celebrateWorkDoneBody(booking.labour.name),
+      ),
+    );
   }
 
   /// "Payment done". Same reasoning, and the same prompt lands on the worker's
@@ -156,8 +209,17 @@ class _BookingsScreenState extends State<BookingsScreen>
         s.markPaymentMessage(booking.labour.name, booking.price), s.yesPaid)) {
       return;
     }
-    await _apply(booking, (repo) => repo.markPaymentDone(booking.id),
-        s.paymentDoneMarked);
+    await _apply(
+      booking,
+      (repo) => repo.markPaymentDone(booking.id),
+      () => KwCelebration.show(
+        context,
+        title: s.celebratePaymentTitle,
+        message: s.celebratePaymentBody(booking.labour.name),
+        detail: '₹${booking.price}',
+        detailIcon: Icons.payments_rounded,
+      ),
+    );
   }
 
   /// Yes/no dialog shared by the two wrap-up actions.
@@ -191,10 +253,14 @@ class _BookingsScreenState extends State<BookingsScreen>
 
   /// Runs one booking action, patches the row in place so it does not jump, and
   /// refreshes quietly behind it.
+  ///
+  /// [announce] rather than a toast string: both callers land on a moment worth
+  /// a celebration, and the popup has to open *after* the row has been patched
+  /// so the list behind the confetti already reads right.
   Future<void> _apply(
     Booking booking,
     Future<Booking> Function(KaamWalaRepository repo) action,
-    String toast,
+    Future<void> Function() announce,
   ) async {
     try {
       final updated = await action(context.repo);
@@ -203,8 +269,8 @@ class _BookingsScreenState extends State<BookingsScreen>
         for (final b in _rows)
           if (b.id == booking.id) updated else b,
       ]);
-      _toast(toast);
       _bookings.load(silent: true);
+      await announce();
     } on Object catch (e) {
       if (mounted) _toast(describeError(context, e));
     }
@@ -225,7 +291,14 @@ class _BookingsScreenState extends State<BookingsScreen>
         for (final b in _rows)
           if (b.id == booking.id) b.copyWith(hasReview: true) else b,
       ]);
-      _toast(context.s.reviewSubmitted(booking.labour.name));
+      final s = context.s;
+      await KwCelebration.show(
+        context,
+        title: s.celebrateReviewTitle,
+        message: s.celebrateReviewBody(booking.labour.name),
+        detail: '${result.rating} ★',
+        detailIcon: Icons.star_rounded,
+      );
     } on Object catch (e) {
       if (mounted) _toast(describeError(context, e));
     }

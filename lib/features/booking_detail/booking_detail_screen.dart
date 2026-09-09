@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/animations/entrance.dart';
+import '../../core/async/live_poll.dart';
 import '../../core/async/loadable.dart';
 import '../../core/i18n/app_strings.dart';
 import '../../core/responsive/responsive.dart';
@@ -8,11 +9,13 @@ import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../data/api/api_config.dart';
 import '../../data/models/models.dart';
 import '../../data/repositories/kaamwala_repository.dart';
 import '../../data/session.dart';
 import '../../widgets/kw_async.dart';
 import '../../widgets/kw_button.dart';
+import '../../widgets/kw_celebration.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
 import '../bookings/widgets/review_sheet.dart';
@@ -53,6 +56,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
     () => context.repo.bookingDetail(widget.bookingId),
   );
 
+  /// The timeline is a live document while the kaam is live: the worker setting
+  /// off moves a step on it from their own phone. Polling is what lets this
+  /// screen show that as it happens instead of only after a trip through the
+  /// background.
+  late final LivePoll _live = LivePoll(
+    onTick: _pollLive,
+    interval: ApiConfig.stagePollInterval,
+  );
+
   bool _busy = false;
 
   @override
@@ -62,6 +74,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
     // accepting, setting off, signing the kaam off, or walking away. None of it
     // reaches the app on its own, so coming back to it is the moment to ask.
     WidgetsBinding.instance.addObserver(this);
+    _detail.addListener(_syncLive);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _detail.load();
     });
@@ -70,13 +83,90 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _live.dispose();
+    _detail.removeListener(_syncLive);
     _detail.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _detail.load(silent: true);
+    if (state == AppLifecycleState.resumed) {
+      _live.resume();
+      _refresh();
+    } else {
+      _live.pause();
+    }
+  }
+
+  /// Only while the booking can still move on its own — a finished or cancelled
+  /// one is history and polling it says nothing.
+  void _syncLive() =>
+      _live.sync(wanted: _detail.value?.booking.isLive ?? false);
+
+  /// One tick. Held back while an action of this Thekedar's own is in flight:
+  /// that path refetches when it lands, and a poll landing on top of it would
+  /// paint the pre-action booking back over the screen.
+  Future<void> _pollLive() async {
+    if (_busy) return;
+    await _refresh();
+  }
+
+  /// Reloads, then says out loud anything the *worker* decided while nobody was
+  /// looking.
+  ///
+  /// The two facts this covers — the money being confirmed received, and the
+  /// kaam being signed off — are the ones that close a booking, and neither
+  /// arrives with a tap to hang a message off. Without this they land as a
+  /// quietly changed line halfway down the screen.
+  Future<void> _refresh() async {
+    final before = _detail.value;
+    await _detail.load(silent: true);
+    if (!mounted) return;
+    await _announceWorkerReplies(before, _detail.value);
+  }
+
+  Future<void> _announceWorkerReplies(
+    BookingDetail? before,
+    BookingDetail? after,
+  ) async {
+    // Nothing to compare against on the first load: a booking that was already
+    // settled when the screen opened is history, not news.
+    if (before == null || after == null) return;
+    // Only the screen on top gets to interrupt.
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+
+    final s = context.s;
+    final name = after.labour.name;
+
+    // The worker setting off. A line rather than the celebration popup: this is
+    // the journey starting, not the kaam — the timeline right underneath is
+    // already showing it, and this only makes sure it is not missed.
+    if (before.booking.jobStage == JobStage.pending &&
+        after.booking.jobStage == JobStage.onTheWay) {
+      _toast(s.labourOnTheWay(name));
+    }
+
+    if (before.booking.completionResponse == null &&
+        after.booking.completionResponse == 'agreed') {
+      await KwCelebration.show(
+        context,
+        title: s.celebrateLabourAgreedTitle(name),
+        message: s.celebrateLabourAgreedBody,
+      );
+      if (!mounted) return;
+    }
+
+    if (before.payment.confirmedAt == null &&
+        after.payment.confirmedAt != null) {
+      await KwCelebration.show(
+        context,
+        title: s.celebratePaymentConfirmedTitle(name),
+        message: s.celebratePaymentConfirmedBody,
+        detail: '₹${after.payment.amount}',
+        detailIcon: Icons.verified_rounded,
+      );
+    }
   }
 
   Booking? get _booking => _detail.value?.booking ?? widget.preview;
@@ -93,23 +183,31 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
   /// worker's screen) and this screen renders the whole sequence. Guessing at
   /// the new timeline locally is exactly the kind of lie the screen exists to
   /// avoid.
+  ///
+  /// [toast] for the quiet outcomes and [announce] for the ones worth a
+  /// celebration — the popup opens only after the refetch, so the timeline
+  /// behind the confetti already shows the step that just landed.
   Future<void> _run(
-    Future<void> Function(KaamWalaRepository repo) action,
-    String toast,
-  ) async {
+    Future<void> Function(KaamWalaRepository repo) action, {
+    String? toast,
+    Future<void> Function()? announce,
+  }) async {
     if (_busy) return;
     setState(() => _busy = true);
 
     try {
       await action(context.repo);
       if (!mounted) return;
-      _toast(toast);
+      if (toast != null) _toast(toast);
       await _detail.load(silent: true);
     } on Object catch (e) {
       if (mounted) _toast(describeError(context, e));
+      return;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+
+    if (mounted && announce != null) await announce();
   }
 
   Future<void> _cancel(Booking booking) async {
@@ -122,7 +220,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
     )) {
       return;
     }
-    await _run((repo) => repo.cancelBooking(booking.id), s.bookingCancelled);
+    await _run(
+      (repo) => repo.cancelBooking(booking.id),
+      toast: s.bookingCancelled,
+    );
   }
 
   Future<void> _complete(Booking booking) async {
@@ -134,7 +235,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
     )) {
       return;
     }
-    await _run((repo) => repo.completeBooking(booking.id), s.workDoneMarked);
+    await _run(
+      (repo) => repo.completeBooking(booking.id),
+      announce: () => KwCelebration.show(
+        context,
+        title: s.celebrateWorkDoneTitle,
+        message: s.celebrateWorkDoneBody(_workerName),
+      ),
+    );
   }
 
   Future<void> _payment(Booking booking, int amount) async {
@@ -146,20 +254,36 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
     )) {
       return;
     }
-    await _run((repo) => repo.markPaymentDone(booking.id), s.paymentDoneMarked);
+    await _run(
+      (repo) => repo.markPaymentDone(booking.id),
+      announce: () => KwCelebration.show(
+        context,
+        title: s.celebratePaymentTitle,
+        message: s.celebratePaymentBody(_workerName),
+        detail: '₹$amount',
+        detailIcon: Icons.payments_rounded,
+      ),
+    );
   }
 
   Future<void> _review(Booking booking) async {
     final draft = await ReviewSheet.show(context, booking: booking);
     if (draft == null || !mounted) return;
 
+    final s = context.s;
     await _run(
       (repo) => repo.reviewBooking(
         bookingId: booking.id,
         rating: draft.rating,
         comment: draft.comment,
       ),
-      context.s.reviewSubmitted(_workerName),
+      announce: () => KwCelebration.show(
+        context,
+        title: s.celebrateReviewTitle,
+        message: s.celebrateReviewBody(_workerName),
+        detail: '${draft.rating} ★',
+        detailIcon: Icons.star_rounded,
+      ),
     );
   }
 
@@ -174,8 +298,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
     );
     if (confirmed != true || !mounted) return;
 
-    _toast(context.s.arrivalDone);
+    final s = context.s;
     await _detail.load(silent: true);
+    if (!mounted) return;
+
+    await KwCelebration.show(
+      context,
+      title: s.celebrateWorkStartedTitle,
+      message: s.celebrateWorkStartedBody(_workerName),
+    );
   }
 
   Future<void> _endJob() async {
@@ -195,7 +326,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
     if (!mounted) return;
     // Tracking is where a refusal or a stopped job is learned about, so coming
     // back from it is the one moment this screen is guaranteed to be stale.
-    await _detail.load(silent: true);
+    await _refresh();
   }
 
   void _openProfile(int labourId) =>

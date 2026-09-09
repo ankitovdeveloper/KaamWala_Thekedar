@@ -56,4 +56,13 @@ abstract final class ApiConfig {
   /// live. Between polls the marker animates to the new position, so this is
   /// a data-freshness knob, not a smoothness one.
   static const trackingPollInterval = Duration(seconds: 4);
+
+  /// How often a screen that is *showing* a live booking re-reads it, so a
+  /// stage the worker moved — "Raaste mein" above all — lands without anyone
+  /// pulling to refresh.
+  ///
+  /// Slower than [trackingPollInterval] on purpose: those screens are a list
+  /// row and a timeline, not a dot sliding across a map, and a stage changes a
+  /// handful of times a day rather than every second.
+  static const stagePollInterval = Duration(seconds: 5);
 }

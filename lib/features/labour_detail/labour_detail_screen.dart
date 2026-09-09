@@ -12,6 +12,7 @@ import '../../data/models/models.dart';
 import '../../data/session.dart';
 import '../../widgets/kw_async.dart';
 import '../../widgets/kw_button.dart';
+import '../../widgets/kw_celebration.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
 import 'widgets/booking_sheet.dart';
@@ -91,6 +92,19 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
     if (booking == null || !mounted) return;
 
     setState(() => _booked = true);
+
+    final s = context.s;
+    // The sheet closing is not an answer — this is the first moment the
+    // Thekedar knows the request actually went. Worth a beat before the map.
+    await KwCelebration.show(
+      context,
+      title: s.celebrateRequestSentTitle,
+      message: s.celebrateRequestSentBody(labour.name),
+      detail: '₹${booking.price} · ${booking.whenLabelIn(s)}',
+      detailIcon: Icons.event_available_rounded,
+      primaryLabel: s.celebrateTrack,
+    );
+    if (!mounted) return;
 
     // Straight into tracking: the request is now with the worker, and this is
     // the screen that shows their answer arriving and then where they are.
