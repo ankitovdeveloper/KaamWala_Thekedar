@@ -77,6 +77,7 @@ class MockRepository implements KaamWalaRepository {
     required String otp,
     String countryCode = '+91',
     SignupDraft? draft,
+    String? termsVersion,
   }) async {
     await _delayed(null);
     // Mirrors the server's rejection path so the error UI is reachable offline.
@@ -159,6 +160,12 @@ class MockRepository implements KaamWalaRepository {
 
   @override
   Future<List<Skill>> skills() => _delayed(Mock.allSkills);
+
+  /// The demo build has no admin panel behind it, so it serves the copy
+  /// compiled into the app — the same thing the API repository falls back to.
+  @override
+  Future<LegalDocument> legalDocument(LegalDoc doc) =>
+      _delayed(LegalDocument.bundled(doc));
 
   @override
   Future<bool> toggleSaved(int labourId) {

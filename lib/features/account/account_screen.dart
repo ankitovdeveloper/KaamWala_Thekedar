@@ -14,6 +14,7 @@ import '../../data/session.dart';
 import '../../widgets/kw_async.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
+import '../../widgets/kw_terms.dart';
 
 /// Account settings, backed by `GET /v1/thekedar/account` and
 /// `PUT /v1/thekedar/account/preferences`.
@@ -351,7 +352,13 @@ class _AccountScreenState extends State<AccountScreen> {
                       KwMenuRow(
                         icon: Icons.description_outlined,
                         label: s.terms,
-                        onTap: () => _toast(s.terms),
+                        onTap: () => LegalSheet.show(context, LegalDoc.terms),
+                      ),
+                      KwMenuRow(
+                        icon: Icons.privacy_tip_outlined,
+                        label: s.privacyPolicy,
+                        onTap: () =>
+                            LegalSheet.show(context, LegalDoc.privacy),
                       ),
                       KwMenuRow(
                         icon: Icons.info_outline_rounded,

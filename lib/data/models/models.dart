@@ -1740,3 +1740,130 @@ class OtpChallenge {
     debugCode: json.strOrNull('otp'),
   );
 }
+
+// ── Legal copy ───────────────────────────────────────────────────────────────
+
+/// The two documents the login and register screens link to.
+enum LegalDoc {
+  terms,
+  privacy;
+
+  /// The `{slug}` in `GET /legal/{slug}`.
+  String get slug => name;
+}
+
+/// `GET /legal/{slug}?app=thekedar` — the Terms & Conditions / Privacy Policy,
+/// written and reworded in the admin panel rather than shipped in the app.
+///
+/// [version] is what gets sent back with the sign-up so the server can record
+/// which wording the user actually agreed to; it moves when the admin edits the
+/// text, so an accepted "1.0" stays distinguishable from a later "1.1".
+///
+/// [body] is plain text on purpose: the admin panel refuses markup because this
+/// is rendered as text on a phone, with blank lines separating paragraphs and a
+/// numbered or colon-ended first line read as that paragraph's heading.
+@immutable
+class LegalDocument {
+  const LegalDocument({
+    required this.slug,
+    required this.title,
+    required this.body,
+    required this.version,
+    this.isFallback = false,
+  });
+
+  final String slug;
+  final String title;
+  final String body;
+  final String version;
+
+  /// True for [LegalDocument.bundled] — the copy compiled into the app,
+  /// shown when the server cannot be reached or is older than this build.
+  /// Nothing is sent as an accepted version in that case: see [acceptedVersion].
+  final bool isFallback;
+
+  /// What to report as accepted. Null for the bundled copy, because claiming a
+  /// version the server never served would put a wording in the acceptance
+  /// record that nobody can look up.
+  String? get acceptedVersion => isFallback ? null : version;
+
+  factory LegalDocument.fromJson(Map<String, dynamic> json) => LegalDocument(
+    slug: json.str('slug'),
+    title: json.str('title'),
+    body: json.str('body'),
+    version: json.strOrNull('version') ?? '1.0',
+  );
+
+  /// The copy compiled into this build, used when `GET /legal/{slug}` fails —
+  /// an old server that predates the endpoint, or simply no signal. A blank
+  /// sheet under a tick box the user is being asked to agree to would be worse
+  /// than slightly stale wording.
+  static LegalDocument bundled(LegalDoc doc) => switch (doc) {
+    LegalDoc.terms => const LegalDocument(
+      slug: 'terms',
+      title: 'Terms & Conditions',
+      version: '1.0',
+      isFallback: true,
+      body: _bundledTerms,
+    ),
+    LegalDoc.privacy => const LegalDocument(
+      slug: 'privacy',
+      title: 'Privacy Policy',
+      version: '1.0',
+      isFallback: true,
+      body: _bundledPrivacy,
+    ),
+  };
+}
+
+/// Kept in step with the seed in
+/// `database/migrations/…_create_legal_documents_table.php`.
+const _bundledTerms = '''
+1. Account aur pehchaan
+KaamWala par account banane ke liye aapka mobile number OTP se verify kiya jaata hai. Aap jo jaankari dete hain (naam, city, skills, documents) woh sahi honi chahiye. Galat jaankari par account band kiya ja sakta hai.
+
+2. Kaam aur booking
+App sirf Thekedar aur Labour ko aapas mein jodne ka zariya hai. Kaam ki quality, samay aur vyavhaar ki zimmedari dono paksh ki apni hai. Booking accept karne ke baad tay kiya gaya samay aur rate maanya hoga.
+
+3. Payment
+Rate booking ke samay tay hota hai. Kaam poora hone par payment usi rate par karni hoti hai. Payment ka lenden dono paksh ke beech hai; app uska record rakhta hai.
+
+4. Cancellation
+Booking cancel karne par doosre paksh ko turant soochna di jaati hai. Baar-baar bina wajah cancel karne par account par rok lagayi ja sakti hai.
+
+5. Location
+Kaam ke dauraan Labour ki location Thekedar ko dikhayi jaati hai, taaki pata chale ki worker kab pahunch raha hai. Duty band karne par tracking bhi band ho jaati hai.
+
+6. Vyavhaar
+Gaali-galauj, dhamki, bhedbhav ya kisi bhi tarah ka utpeedan bardasht nahi kiya jayega. Aisi shikayat par account hamesha ke liye band kiya ja sakta hai.
+
+7. Account band karna
+Niyam todne par hum bina purv soochna ke account rok ya band kar sakte hain.
+
+8. Badlav
+In sharton mein badlav hone par app mein nayi shartein dikhayi jaayengi. Aage app istemal karne ka matlab hai aap nayi shartein maante hain.''';
+
+const _bundledPrivacy = '''
+1. Hum kya jaankari lete hain
+Naam, mobile number, email, city, address, skills, rate, aur (Labour ke liye) pehchaan ke documents. Kaam ke dauraan aapki location bhi li jaati hai.
+
+2. Iska istemal kis liye hota hai
+Aapko aas-paas ka kaam ya worker dikhane ke liye, booking chalane ke liye, aur kaam ke dauraan live location dikhane ke liye. Isi se hum fraud rokte hain aur support de paate hain.
+
+3. Location
+Location sirf tab li jaati hai jab aap duty par hain ya koi booking chal rahi hai. Duty band karte hi location lena band ho jaata hai.
+
+4. Kis-kis ko dikhti hai jaankari
+Booking se juda doosra paksh aapka naam, photo, rating aur kaam ke dauraan location dekh sakta hai. Documents sirf verification team dekhti hai — doosre users ko nahi dikhte.
+
+5. Hum jaankari bechte nahi hain
+Aapka data kisi bhi vigyapan company ko na becha jaata hai na kiraye par diya jaata hai.
+
+6. Data kitne samay tak rakha jaata hai
+Account chalu rehne tak, aur uske baad kanooni zarurat ke hisaab se. Account delete karne par personal jaankari hata di jaati hai.
+
+7. Aapke adhikar
+Aap apni jaankari kabhi bhi dekh, sudhaar ya hata sakte hain — app ke Account section se ya support se sampark karke.
+
+8. Sampark
+Privacy se judi kisi baat ke liye app ke Help & Support se sampark karein.''';

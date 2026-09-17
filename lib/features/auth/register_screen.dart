@@ -16,6 +16,7 @@ import '../../widgets/kw_async.dart';
 import '../../widgets/kw_button.dart';
 import '../../widgets/kw_field.dart';
 import '../../widgets/kw_scaffold.dart';
+import '../../widgets/kw_terms.dart';
 import 'otp_screen.dart';
 
 /// Thekedar sign-up, backed by `POST /v1/auth/register`.
@@ -45,6 +46,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _emailError;
   int _shake = 0;
 
+  /// The Terms tick box. Deliberately not remembered between launches: a box
+  /// that arrives already ticked is not consent.
+  bool _agreed = false;
+  String? _termsError;
+
+  /// Which wording the box is agreeing to, carried through to `verify-otp`
+  /// where the account is created. Null while it loads, and for good if the
+  /// app is showing its bundled copy — see [LegalDocument.acceptedVersion].
+  String? _termsVersion;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadTermsVersion());
+  }
+
+  Future<void> _loadTermsVersion() async {
+    final doc = await context.repo.legalDocument(LegalDoc.terms);
+    if (mounted) setState(() => _termsVersion = doc.acceptedVersion);
+  }
+
   @override
   void dispose() {
     _name.dispose();
@@ -72,19 +94,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final emailError = email.isNotEmpty && !_looksLikeEmail(email)
         ? s.emailInvalid
         : null;
+    final termsError = _agreed ? null : s.termsRequired;
 
     setState(() {
       _nameError = nameError;
       _phoneError = phoneError;
       _addressError = addressError;
       _emailError = emailError;
+      _termsError = termsError;
     });
 
     final ok =
         nameError == null &&
         phoneError == null &&
         addressError == null &&
-        emailError == null;
+        emailError == null &&
+        termsError == null;
     if (!ok) {
       setState(() => _shake++);
       HapticFeedback.heavyImpact();
@@ -126,6 +151,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           debugCode: challenge.debugCode,
           // What makes the OTP screen finish a sign-up rather than a login.
           draft: draft,
+          termsVersion: _termsVersion,
         ),
       );
     } on Object catch (e) {
@@ -314,10 +340,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               child: FadeSlideIn(
                 delay: const Duration(milliseconds: 540),
-                child: Text(
-                  s.termsLine,
-                  textAlign: TextAlign.center,
-                  style: AppType.micro.copyWith(height: 1.5),
+                child: KwTermsCheck(
+                  value: _agreed,
+                  errorText: _termsError,
+                  onChanged: (v) => setState(() {
+                    _agreed = v;
+                    if (v) _termsError = null;
+                  }),
                 ),
               ),
             ),

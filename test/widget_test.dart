@@ -15,6 +15,7 @@ import 'package:kaamwala_thekedar/features/search/search_screen.dart';
 import 'package:kaamwala_thekedar/features/shell/home_shell.dart';
 import 'package:kaamwala_thekedar/widgets/kw_bottom_nav.dart';
 import 'package:kaamwala_thekedar/widgets/kw_common.dart';
+import 'package:kaamwala_thekedar/widgets/kw_terms.dart';
 
 /// Wraps a screen in just enough app chrome to pump it in isolation, backed by
 /// the zero-latency mock repository.
@@ -46,6 +47,16 @@ Widget hostApp() => MediaQuery(
   child: KaamWalaApp(session: Session.mock()),
 );
 
+/// Ticks the Terms box on the Login screen. Signing in is gated on it, so
+/// every test that gets past the button has to do this first.
+Future<void> acceptTerms(WidgetTester tester) async {
+  final box = find.byType(KwTermsCheck);
+  await tester.ensureVisible(box);
+  await tester.pumpAndSettle();
+  await tester.tap(box);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   group('Login', () {
     testWidgets('renders and rejects a short phone number', (tester) async {
@@ -62,11 +73,29 @@ void main() {
       expect(find.text('Poora 10-digit number daalein'), findsOneWidget);
     });
 
+    testWidgets('a valid number alone is not enough — Terms gate the send', (
+      tester,
+    ) async {
+      await tester.pumpWidget(hostApp());
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, '9876543210');
+      await tester.tap(find.text('OTP Bhejo'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Aage badhne ke liye shartein accept karna zaroori hai'),
+        findsOneWidget,
+      );
+      expect(find.text('OTP Verify karein'), findsNothing);
+    });
+
     testWidgets('valid number routes to the OTP screen', (tester) async {
       await tester.pumpWidget(hostApp());
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).first, '9876543210');
+      await acceptTerms(tester);
       await tester.tap(find.text('OTP Bhejo'));
       await tester.pumpAndSettle();
 
@@ -81,6 +110,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).first, '9876543210');
+      await acceptTerms(tester);
       await tester.tap(find.text('OTP Bhejo'));
       await tester.pumpAndSettle();
 

@@ -74,6 +74,7 @@ class ApiRepository implements KaamWalaRepository {
     required String otp,
     String countryCode = '+91',
     SignupDraft? draft,
+    String? termsVersion,
   }) async {
     final data = await _api.post(
       'auth/verify-otp',
@@ -86,6 +87,11 @@ class ApiRepository implements KaamWalaRepository {
         // requires the OTP to have come from `/auth/register` and refuses a
         // number that has been claimed in the meantime.
         if (draft != null) ...{'purpose': 'register', ...draft.toJson()},
+        // Both screens gate their button on the tick box, so reaching here
+        // means it was ticked. The version says which wording; it is absent
+        // when the app fell back to its bundled copy.
+        'terms_accepted': true,
+        'terms_version': ?termsVersion,
       },
     );
     return AuthResult.fromJson(_obj(data));
@@ -96,6 +102,28 @@ class ApiRepository implements KaamWalaRepository {
 
   @override
   Future<AppUser> me() async => AppUser.fromJson(_obj(await _api.get('me')));
+
+  // ── Legal copy ────────────────────────────────────────────────────────────
+
+  @override
+  Future<LegalDocument> legalDocument(LegalDoc doc) async {
+    try {
+      final data = await _api.get(
+        'legal/${doc.slug}',
+        query: {'app': ApiConfig.role},
+      );
+      final json = _obj(data);
+      // A 200 with nothing usable in it counts as a miss: an empty sheet
+      // under the tick box would read as the app being broken.
+      if (json['body'] is String && (json['body'] as String).trim().isNotEmpty) {
+        return LegalDocument.fromJson(json);
+      }
+    } catch (_) {
+      // Deliberately swallowed — see the interface doc. The live server may
+      // still be older than this build, and the user is mid sign-up.
+    }
+    return LegalDocument.bundled(doc);
+  }
 
   // ── Search & detail ───────────────────────────────────────────────────────
 

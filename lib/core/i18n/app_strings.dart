@@ -80,8 +80,23 @@ class AppStrings {
   String get or => 'ya';
   String get googleLogin => 'Google se login karein';
   String get googleSignIn => 'Google Sign-In';
-  String get termsLine =>
-      'Aage badhne ka matlab hai aap Terms aur Privacy Policy se sehmat hain';
+  /// The tick box on the login and register screens, in three pieces:
+  /// prefix + [terms] link + join + [privacyPolicy] link + suffix. Split this
+  /// way because the two document names are tappable, and where they sit in
+  /// the sentence differs by language.
+  String get termsAgreePrefix => 'Maine ';
+  String get termsAgreeJoin => ' aur ';
+  String get termsAgreeSuffix => ' padh li hai aur inse sehmat hoon';
+  String get privacyPolicy => 'Privacy Policy';
+
+  /// Shown under the box when someone taps the button without ticking it.
+  String get termsRequired =>
+      'Aage badhne ke liye shartein accept karna zaroori hai';
+
+  /// Footer of the document sheet — which wording is on screen.
+  String termsVersion(String version) => 'Version $version';
+
+  String get closeLabel => 'Band karein';
 
   // ── Register ──────────────────────────────────────────────────────────────
 
@@ -704,8 +719,20 @@ class _Hindi extends AppStrings {
   @override
   String get googleLogin => 'Google से लॉगिन करें';
   @override
-  String get termsLine =>
-      'आगे बढ़ने का मतलब है आप Terms और Privacy Policy से सहमत हैं';
+  String get termsAgreePrefix => 'मैंने ';
+  @override
+  String get termsAgreeJoin => ' और ';
+  @override
+  String get termsAgreeSuffix => ' पढ़ ली हैं और मैं इनसे सहमत हूँ';
+  @override
+  String get privacyPolicy => 'प्राइवेसी पॉलिसी';
+  @override
+  String get termsRequired =>
+      'आगे बढ़ने के लिए शर्तें स्वीकार करना ज़रूरी है';
+  @override
+  String termsVersion(String version) => 'वर्ज़न $version';
+  @override
+  String get closeLabel => 'बंद करें';
 
   @override
   String get registerWelcome => 'खाता बनाएँ 🧰';
@@ -1618,8 +1645,20 @@ class _English extends AppStrings {
   @override
   String get googleLogin => 'Continue with Google';
   @override
-  String get termsLine =>
-      'By continuing you agree to our Terms and Privacy Policy';
+  String get termsAgreePrefix => 'I have read and agree to the ';
+  @override
+  String get termsAgreeJoin => ' and the ';
+  @override
+  String get termsAgreeSuffix => '';
+  @override
+  String get privacyPolicy => 'Privacy Policy';
+  @override
+  String get termsRequired =>
+      'Please accept the terms to continue';
+  @override
+  String termsVersion(String version) => 'Version $version';
+  @override
+  String get closeLabel => 'Close';
 
   @override
   String get registerWelcome => 'Create your account 🧰';
@@ -3056,6 +3095,17 @@ class _Bhojpuri extends _Hindi {
   String get helpSupport => 'मदद आ सपोर्ट';
   @override
   String get terms => 'नियम आ सरत';
+  @override
+  String get termsAgreePrefix => 'हम ';
+  @override
+  String get termsAgreeJoin => ' आ ';
+  @override
+  String get termsAgreeSuffix => ' पढ़ लेले बानी आ एकरा से राजी बानी';
+  @override
+  String get termsRequired =>
+      'आगे बढ़े खातिर सरत मानल जरूरी बा';
+  @override
+  String get closeLabel => 'बंद करीं';
   @override
   String get appVersion => 'ऐप वर्जन';
   @override

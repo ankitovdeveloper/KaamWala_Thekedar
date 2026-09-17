@@ -29,6 +29,7 @@ class OtpArgs {
     this.resendIn = 30,
     this.debugCode,
     this.draft,
+    this.termsVersion,
   });
 
   /// Bare digits — the format the API expects back on verify.
@@ -46,6 +47,15 @@ class OtpArgs {
   /// creates the account — so without it a sign-up would land on a blank
   /// profile and ask for everything again.
   final SignupDraft? draft;
+
+  /// The version of the Terms the user ticked on the screen that sent them
+  /// here. Passed on to `verify-otp`, which is where the account is created
+  /// and so the only place the acceptance can be recorded against a row.
+  ///
+  /// Null when the sheet fell back to the copy bundled with the app: the
+  /// server would have no such version on file, and a made-up number in the
+  /// acceptance record is worse than a blank one.
+  final String? termsVersion;
 
   /// Whether this is the sign-up flow rather than a login.
   bool get isSignup => draft != null;
@@ -185,6 +195,7 @@ class _OtpScreenState extends State<OtpScreen> {
         otp: _code,
         countryCode: widget.args.countryCode,
         draft: widget.args.draft,
+        termsVersion: widget.args.termsVersion,
       );
       await session.signIn(result);
       if (!mounted) return;

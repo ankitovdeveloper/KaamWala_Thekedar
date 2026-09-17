@@ -10,11 +10,13 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_typography.dart';
 import '../../data/api/api_exception.dart';
+import '../../data/models/models.dart';
 import '../../data/session.dart';
 import '../../widgets/kw_async.dart';
 import '../../widgets/kw_button.dart';
 import '../../widgets/kw_field.dart';
 import '../../widgets/kw_scaffold.dart';
+import '../../widgets/kw_terms.dart';
 import 'otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -29,6 +31,29 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _busy = false;
   String? _error;
   int _shake = 0;
+
+  /// The Terms tick box. Deliberately not remembered between launches: a box
+  /// that arrives already ticked is not consent.
+  bool _agreed = false;
+  String? _termsError;
+
+  /// Which wording the box is agreeing to, sent on with `verify-otp`. Null
+  /// while it loads, and for good if the app is showing its bundled copy —
+  /// see [LegalDocument.acceptedVersion].
+  String? _termsVersion;
+
+  @override
+  void initState() {
+    super.initState();
+    // One small GET, started as the screen opens so the version is in hand
+    // long before anyone has finished typing a phone number.
+    unawaited(_loadTermsVersion());
+  }
+
+  Future<void> _loadTermsVersion() async {
+    final doc = await context.repo.legalDocument(LegalDoc.terms);
+    if (mounted) setState(() => _termsVersion = doc.acceptedVersion);
+  }
 
   @override
   void dispose() {
@@ -46,6 +71,12 @@ class _LoginScreenState extends State<LoginScreen> {
         _error = context.s.phoneInvalid;
         _shake++;
       });
+      HapticFeedback.heavyImpact();
+      return;
+    }
+
+    if (!_agreed) {
+      setState(() => _termsError = context.s.termsRequired);
       HapticFeedback.heavyImpact();
       return;
     }
@@ -68,6 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
           countryCode: challenge.countryCode,
           resendIn: challenge.resendIn,
           debugCode: challenge.debugCode,
+          termsVersion: _termsVersion,
         ),
       );
     } on Object catch (e) {
@@ -168,10 +200,13 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               child: FadeSlideIn(
                 delay: const Duration(milliseconds: 640),
-                child: Text(
-                  s.termsLine,
-                  textAlign: TextAlign.center,
-                  style: AppType.micro.copyWith(height: 1.5),
+                child: KwTermsCheck(
+                  value: _agreed,
+                  errorText: _termsError,
+                  onChanged: (v) => setState(() {
+                    _agreed = v;
+                    if (v) _termsError = null;
+                  }),
                 ),
               ),
             ),

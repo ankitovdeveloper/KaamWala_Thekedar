@@ -8,6 +8,7 @@ import 'package:kaamwala_thekedar/data/session.dart';
 import 'package:kaamwala_thekedar/features/auth/login_screen.dart';
 import 'package:kaamwala_thekedar/features/auth/register_screen.dart';
 import 'package:kaamwala_thekedar/widgets/kw_bottom_nav.dart';
+import 'package:kaamwala_thekedar/widgets/kw_terms.dart';
 
 import 'widget_test.dart' show host, hostApp;
 
@@ -21,6 +22,10 @@ class _RecordingRepository extends MockRepository {
 
   SignupDraft? registered;
   SignupDraft? verifiedWith;
+
+  /// The Terms version the screen ticked the box against, as sent on to
+  /// `verify-otp`.
+  String? verifiedTermsVersion;
 
   @override
   Future<OtpChallenge> register({
@@ -50,13 +55,16 @@ class _RecordingRepository extends MockRepository {
     required String otp,
     String countryCode = '+91',
     SignupDraft? draft,
+    String? termsVersion,
   }) {
     verifiedWith = draft;
+    verifiedTermsVersion = termsVersion;
     return super.verifyOtp(
       phone: phone,
       otp: otp,
       countryCode: countryCode,
       draft: draft,
+      termsVersion: termsVersion,
     );
   }
 }
@@ -69,12 +77,25 @@ Future<void> fillForm(
   String phone = '9812345678',
   String address = 'Sector 45, Gurgaon',
   String email = '',
+  bool acceptTerms = true,
 }) async {
   final fields = find.byType(TextField);
   await tester.enterText(fields.at(0), name);
   await tester.enterText(fields.at(1), phone);
   await tester.enterText(fields.at(2), address);
   if (email.isNotEmpty) await tester.enterText(fields.at(3), email);
+  await tester.pumpAndSettle();
+  if (acceptTerms) await tickTerms(tester);
+}
+
+/// Ticks the Terms box. Its own helper because the box is a gate, not a
+/// field: a test that wants to prove the gate holds fills the form *without*
+/// it (`fillForm(acceptTerms: false)`).
+Future<void> tickTerms(WidgetTester tester) async {
+  final box = find.byType(KwTermsCheck);
+  await tester.ensureVisible(box);
+  await tester.pumpAndSettle();
+  await tester.tap(box);
   await tester.pumpAndSettle();
 }
 
@@ -114,8 +135,36 @@ void main() {
       expect(find.text('Naam daalein'), findsOneWidget);
       expect(find.text('Poora 10-digit number daalein'), findsOneWidget);
       expect(find.text('Apna address daalein'), findsOneWidget);
+      // The Terms box is flagged in the same pass, not on a later submit.
+      expect(
+        find.text('Aage badhne ke liye shartein accept karna zaroori hai'),
+        findsOneWidget,
+      );
       // Nothing left the device.
       expect(repo.registered, isNull);
+    });
+
+    testWidgets('a filled form still will not submit until Terms are ticked', (
+      tester,
+    ) async {
+      final repo = _RecordingRepository();
+      await tester.pumpWidget(host(const RegisterScreen(), repository: repo));
+      await tester.pumpAndSettle();
+
+      await fillForm(tester, acceptTerms: false);
+      await tapSubmit(tester);
+
+      expect(
+        find.text('Aage badhne ke liye shartein accept karna zaroori hai'),
+        findsOneWidget,
+      );
+      expect(repo.registered, isNull);
+
+      // Ticking it is the only thing that was missing.
+      await tickTerms(tester);
+      await tapSubmit(tester);
+
+      expect(repo.registered, isNotNull);
     });
 
     testWidgets('a blank email is accepted, a malformed one is not', (

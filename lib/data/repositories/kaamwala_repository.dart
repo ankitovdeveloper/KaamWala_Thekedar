@@ -33,11 +33,16 @@ abstract interface class KaamWalaRepository {
   /// Pass [draft] for the sign-up flow: it sends `purpose=register` along with
   /// the details typed on the Register screen, which the server writes onto the
   /// account it creates. Omit it and this is an ordinary login.
+  ///
+  /// [termsVersion] is the wording the user ticked the box against on the
+  /// login or register screen. The account does not exist until this call,
+  /// so this is the only point at which that consent can be written down.
   Future<AuthResult> verifyOtp({
     required String phone,
     required String otp,
     String countryCode,
     SignupDraft? draft,
+    String? termsVersion,
   });
 
   /// `POST /auth/logout`
@@ -63,6 +68,15 @@ abstract interface class KaamWalaRepository {
 
   /// `GET /thekedar/all-labours-for-search`
   Future<List<Labour>> allLaboursForSearch();
+
+  /// `GET /legal/{slug}?app=thekedar` — the Terms & Conditions or Privacy
+  /// Policy the login and register screens link to.
+  ///
+  /// Never throws: a server that predates the endpoint, or no signal at all,
+  /// yields [LegalDocument.bundled] rather than an error, because the sheet
+  /// sits behind a tick box the user is being asked to agree to and showing
+  /// them nothing there is worse than showing slightly stale wording.
+  Future<LegalDocument> legalDocument(LegalDoc doc);
 
   /// `GET /skills` — master list for the filter sheet.
   Future<List<Skill>> skills();
