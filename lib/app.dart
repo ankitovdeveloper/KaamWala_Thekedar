@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 
+import 'core/notifications/notification_service.dart';
 import 'core/responsive/responsive.dart';
 import 'core/router/routes.dart';
 import 'core/theme/app_theme.dart';
@@ -18,7 +19,6 @@ class KaamWalaApp extends StatefulWidget {
 
 class _KaamWalaAppState extends State<KaamWalaApp> {
   late final Session _session = widget.session ?? Session();
-  final _navigatorKey = GlobalKey<NavigatorState>();
 
   bool _wasAuthenticated = false;
 
@@ -30,6 +30,18 @@ class _KaamWalaAppState extends State<KaamWalaApp> {
     // `isRestored`, and a mock session's restore is a no-op that just flips the
     // flag so tests still reach the login screen.
     _session.restore();
+
+    // Fire-and-forget: Firebase init + the permission prompt must not hold up
+    // the first frame, and a build without google-services.json just never
+    // becomes ready (see NotificationService's own try/catch). Skipped for an
+    // injected (test/mock) session, which has no real backend to register a
+    // token with anyway.
+    if (widget.session == null) {
+      NotificationService.instance
+        ..onToken = _session.registerFcmToken
+        ..onTap = _handleNotificationTap;
+      NotificationService.instance.init();
+    }
   }
 
   /// When the server invalidates the token mid-session, drop straight back to
@@ -37,12 +49,25 @@ class _KaamWalaAppState extends State<KaamWalaApp> {
   void _onSessionChanged() {
     final isAuthed = _session.isAuthenticated;
     if (_wasAuthenticated && !isAuthed) {
-      _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+      Routes.navigatorKey.currentState?.pushNamedAndRemoveUntil(
         Routes.login,
         (_) => false,
       );
     }
     _wasAuthenticated = isAuthed;
+  }
+
+  /// A tapped notification always carries `type: booking` today (see the
+  /// backend's `FcmService::sendBooking`) and a `booking_id` this Thekedar
+  /// already owns — there is no "pending request" state on this side the way
+  /// there is for the Labour app, so every push opens the same detail screen.
+  void _handleNotificationTap(Map<String, String> data) {
+    final bookingId = int.tryParse(data['booking_id'] ?? '');
+    if (bookingId == null) return;
+    Routes.navigatorKey.currentState?.pushNamed(
+      Routes.bookingDetail,
+      arguments: bookingId,
+    );
   }
 
   @override
@@ -59,7 +84,7 @@ class _KaamWalaAppState extends State<KaamWalaApp> {
       child: MaterialApp(
         title: 'KaamWala',
         debugShowCheckedModeBanner: false,
-        navigatorKey: _navigatorKey,
+        navigatorKey: Routes.navigatorKey,
         theme: AppTheme.light,
         // The splash decides between login and home once the persisted token
         // has been read; booting straight to login would throw that away.

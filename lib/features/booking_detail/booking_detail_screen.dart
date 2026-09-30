@@ -23,6 +23,7 @@ import '../tracking/widgets/arrival_sheet.dart';
 import '../tracking/widgets/end_job_sheet.dart';
 import 'widgets/booking_journey_map.dart';
 import 'widgets/booking_timeline.dart';
+import 'widgets/payment_sheet.dart';
 
 /// One booking, whole — backed by `GET /v1/thekedar/bookings/{id}`.
 ///
@@ -67,6 +68,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
 
   bool _busy = false;
 
+  /// Set once the payment sheet has opened on its own, so it does that once
+  /// per visit — closing it is an answer, and the button stays on the screen.
+  bool _paymentPrompted = false;
+
   @override
   void initState() {
     super.initState();
@@ -75,8 +80,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
     // reaches the app on its own, so coming back to it is the moment to ask.
     WidgetsBinding.instance.addObserver(this);
     _detail.addListener(_syncLive);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _detail.load();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _detail.load();
+      // Opened on a finished, unpaid kaam — from the push saying the worker
+      // is done, as often as not. The money is the only thing left to do.
+      if (mounted) await _promptPayment();
     });
   }
 
@@ -124,6 +133,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
     await _detail.load(silent: true);
     if (!mounted) return;
     await _announceWorkerReplies(before, _detail.value);
+    // The worker finishing the kaam from their side lands here, by poll.
+    if (mounted) await _promptPayment();
   }
 
   Future<void> _announceWorkerReplies(
@@ -243,26 +254,43 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
         message: s.celebrateWorkDoneBody(_workerName),
       ),
     );
+    // Kaam done, so straight on to paying for it.
+    if (mounted) await _promptPayment();
   }
 
-  Future<void> _payment(Booking booking, int amount) async {
-    final s = context.s;
-    if (!await _ask(
-      s.markPaymentTitle,
-      s.markPaymentMessage(_workerName, amount),
-      s.yesPaid,
-    )) {
-      return;
-    }
-    await _run(
-      (repo) => repo.markPaymentDone(booking.id),
-      announce: () => KwCelebration.show(
-        context,
-        title: s.celebratePaymentTitle,
-        message: s.celebratePaymentBody(_workerName),
-        detail: '₹$amount',
-        detailIcon: Icons.payments_rounded,
-      ),
+  /// Opens the payment sheet by itself the first time this visit finds the
+  /// kaam done and the money still owed — whether the worker just finished,
+  /// this Thekedar did, or the booking was opened already in that state.
+  Future<void> _promptPayment() async {
+    final detail = _detail.value;
+    if (_paymentPrompted || _busy || detail == null) return;
+    if (!detail.can.markPayment) return;
+    // Only the screen on top gets to interrupt.
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+    await _pay(detail);
+  }
+
+  /// Offline (cash, which the worker then confirms) or Online to their UPI,
+  /// bank account or QR — the sheet owns every round trip.
+  Future<void> _pay(BookingDetail detail) async {
+    _paymentPrompted = true;
+    final via = await PaymentSheet.show(
+      context,
+      bookingId: widget.bookingId,
+      detail: detail,
+    );
+    if (!mounted) return;
+
+    // Refetched whatever the answer: a checkout closed half-way may still
+    // have landed on the server through Razorpay's webhook.
+    await _detail.load(silent: true);
+    if (!mounted || via == null) return;
+
+    await PaymentSheet.celebrate(
+      context,
+      via,
+      workerName: _workerName,
+      amount: detail.payment.amount,
     );
   }
 
@@ -704,6 +732,20 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
             _row(Icons.history_rounded, s.offeredWas(payment.offeredAmount)),
           if (booking.notes case final notes? when notes.isNotEmpty)
             _row(Icons.sticky_note_2_outlined, '${s.bookingNotesLabel}: $notes'),
+          // Says the worker can be paid online at all, while there is still
+          // something to pay — and opens the same sheet the button does.
+          if (detail.labourPayout case final payout?
+              when payout.hasPaymentMode && detail.can.markPayment) ...[
+            Gap.vMd,
+            KwChipButton(
+              label: payout.isUpi ? s.payoutUpiChip : s.payoutBankChip,
+              icon: payout.isUpi
+                  ? Icons.qr_code_rounded
+                  : Icons.account_balance_outlined,
+              filled: true,
+              onPressed: () => _pay(detail),
+            ),
+          ],
         ],
       ),
     );
@@ -897,9 +939,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
       );
     } else if (can.markPayment) {
       primary = (
-        label: s.markPaymentDone,
+        label: s.payNow,
         icon: Icons.payments_outlined,
-        onTap: () => _payment(booking, detail.payment.amount),
+        onTap: () => _pay(detail),
       );
     } else if (can.review) {
       primary = (
@@ -920,11 +962,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
           icon: Icons.task_alt_rounded,
           onPressed: () => _complete(booking),
         ),
-      if (can.markPayment && primary?.label != s.markPaymentDone)
+      if (can.markPayment && primary?.label != s.payNow)
         KwChipButton(
-          label: s.markPaymentDone,
+          label: s.payNow,
           icon: Icons.payments_outlined,
-          onPressed: () => _payment(booking, detail.payment.amount),
+          onPressed: () => _pay(detail),
         ),
       if (can.review && primary?.label != s.giveReview)
         KwChipButton(

@@ -181,12 +181,80 @@ void main() {
       expect(find.text('Cancel'), findsOneWidget);
     });
 
-    testWidgets('a finished job puts the money first', (tester) async {
+    testWidgets('a finished, unpaid job opens the payment sheet by itself', (
+      tester,
+    ) async {
       await open(tester, 103);
 
+      // The mode is the first question: cash in hand, or through the app.
+      expect(find.text('Payment mode chunein'), findsOneWidget);
+      expect(find.text('Offline'), findsOneWidget);
+      expect(find.text('Online'), findsOneWidget);
+      // ...over the booking's own record, which still says what is owed.
       expect(find.text('Kaam poora hua'), findsOneWidget);
       expect(find.text('Payment baaki hai'), findsOneWidget);
-      expect(find.text('Payment done'), findsOneWidget);
+    });
+
+    testWidgets('closing the sheet pays nothing and leaves the button', (
+      tester,
+    ) async {
+      await open(tester, 103);
+
+      await tester.tapAt(const Offset(20, 20)); // the scrim, above the sheet
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payment mode chunein'), findsNothing);
+      expect(find.text('Payment baaki hai'), findsOneWidget);
+      expect(find.text('Payment karein'), findsOneWidget);
+    });
+
+    testWidgets('offline records the cash and says so', (tester) async {
+      await open(tester, 103);
+
+      await tester.tap(find.text('Offline'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Haan, ₹520 cash de diya'));
+      // The tick is held a moment before the sheet closes.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payment ho gaya!'), findsOneWidget);
+      await tester.tap(find.text('Theek hai'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payment baaki hai'), findsNothing);
+      expect(find.text('Payment karein'), findsNothing);
+    });
+
+    testWidgets('online offers the worker\'s UPI, bank and QR, and pays the '
+        'one they have verified', (tester) async {
+      await open(tester, 103);
+
+      await tester.tap(find.text('Online'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mohd. Iqbal ko kahan bhejein?'), findsOneWidget);
+      expect(find.text('UPI ID'), findsOneWidget);
+      expect(find.text('Bank Account'), findsOneWidget);
+      expect(find.text('QR Code'), findsOneWidget);
+      // This worker saved only a bank account: the other two say so, and the
+      // one that can take the money is picked and opened out.
+      expect(find.text('Add nahi kiya'), findsNWidgets(2));
+      expect(find.text('SBIN0001234'), findsOneWidget);
+
+      // The opened-out details push the button below the fold; the sheet
+      // scrolls.
+      await tester.ensureVisible(find.text('₹520 Pay karein'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('₹520 Pay karein'));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Online payment ho gaya'), findsOneWidget);
+      await tester.tap(find.text('Theek hai'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payment baaki hai'), findsNothing);
     });
 
     testWidgets('carries the full worker record, not just a name', (

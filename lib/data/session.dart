@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/i18n/app_strings.dart';
+import '../core/payments/payment_gateway.dart';
 import 'api/api_client.dart';
 import 'api/api_config.dart';
 import 'models/models.dart';
@@ -18,11 +19,21 @@ import 'repositories/mock_repository.dart';
 /// clears it and flips [isAuthenticated], which the app listens to in order to
 /// bounce back to login.
 class Session extends ChangeNotifier {
-  Session({KaamWalaRepository? repository, ApiClient? client})
-    : _client = client ?? (repository == null ? ApiClient() : null) {
+  Session({
+    KaamWalaRepository? repository,
+    ApiClient? client,
+    PaymentGateway? payments,
+  }) : _client = client ?? (repository == null ? ApiClient() : null) {
     _repository =
         repository ??
         (ApiConfig.useMocks ? MockRepository() : ApiRepository(_client!));
+    // A mock order carries no real Razorpay key, so the mock data gets a
+    // checkout that pretends too.
+    _payments =
+        payments ??
+        (_repository is MockRepository
+            ? const SimulatedGateway()
+            : const RazorpayGateway());
     _client?.onUnauthorized = _onUnauthorized;
   }
 
@@ -44,8 +55,12 @@ class Session extends ChangeNotifier {
 
   final ApiClient? _client;
   late final KaamWalaRepository _repository;
+  late final PaymentGateway _payments;
 
   KaamWalaRepository get repo => _repository;
+
+  /// The checkout the Online side of the payment sheet opens.
+  PaymentGateway get payments => _payments;
 
   AppUser? _user;
   AppUser? get user => _user;
@@ -104,6 +119,29 @@ class Session extends ChangeNotifier {
     _localLocationStamp = DateTime.now();
     updateUser(updated);
     unawaited(_persistLocationStamp(_localLocationStamp!));
+  }
+
+  /// Whatever FCM last handed the app, kept even while logged out so it rides
+  /// along with the next login's `verify-otp` call (read by the OTP screen).
+  String? _pendingFcmToken;
+  String? get pendingFcmToken => _pendingFcmToken;
+
+  /// Wired as `NotificationService.onToken` from `app.dart` — called once a
+  /// token is available and again on every FCM rotation. Silent on failure,
+  /// same as the rest of this class's best-effort persistence: a push token is
+  /// nice to have, never worth surfacing an error over.
+  void registerFcmToken(String token) {
+    _pendingFcmToken = token;
+    if (!isAuthenticated) return;
+    unawaited(_sendFcmToken(token));
+  }
+
+  Future<void> _sendFcmToken(String token) async {
+    try {
+      await _repository.updatePreferences(fcmToken: token);
+    } on Object {
+      // Next rotation (or the next login) gets another chance.
+    }
   }
 
   bool _restored = false;
@@ -322,6 +360,9 @@ extension SessionContext on BuildContext {
 
   /// The repository, without subscribing to session changes.
   KaamWalaRepository get repo => SessionScope.read(this).repo;
+
+  /// The payment checkout, without subscribing to session changes.
+  PaymentGateway get payments => SessionScope.read(this).payments;
 
   /// Localised strings for the current user's language.
   ///

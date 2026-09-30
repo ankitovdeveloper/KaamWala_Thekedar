@@ -250,7 +250,7 @@ class BookingCard extends StatelessWidget {
         // The money is the loudest thing left on a finished job.
         if (booking.canMarkPayment)
           KwChipButton(
-            label: s.markPaymentDone,
+            label: s.payNow,
             icon: Icons.payments_outlined,
             filled: true,
             onPressed: onPaymentDone,

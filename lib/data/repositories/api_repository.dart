@@ -75,6 +75,7 @@ class ApiRepository implements KaamWalaRepository {
     String countryCode = '+91',
     SignupDraft? draft,
     String? termsVersion,
+    String? fcmToken,
   }) async {
     final data = await _api.post(
       'auth/verify-otp',
@@ -92,6 +93,10 @@ class ApiRepository implements KaamWalaRepository {
         // when the app fell back to its bundled copy.
         'terms_accepted': true,
         'terms_version': ?termsVersion,
+        // Whatever FCM handed the app before login finished — already
+        // waiting when the account is created, so pushes work without a
+        // second round trip.
+        'fcm_token': ?fcmToken,
       },
     );
     return AuthResult.fromJson(_obj(data));
@@ -261,6 +266,41 @@ class ApiRepository implements KaamWalaRepository {
   Future<Booking> markPaymentDone(int bookingId) async => Booking.fromJson(
     _obj(await _api.post('thekedar/bookings/$bookingId/payment')),
   );
+
+  @override
+  Future<PaymentOrder> createPaymentOrder(
+    int bookingId, {
+    required OnlinePayMode mode,
+  }) async => PaymentOrder.fromJson(
+    _obj(
+      await _api.post(
+        'thekedar/bookings/$bookingId/payment/order',
+        body: {'payment_mode': mode.wire},
+      ),
+    ),
+  );
+
+  @override
+  Future<void> verifyPayment(
+    int bookingId, {
+    required PaymentReceipt receipt,
+    required OnlinePayMode mode,
+  }) async {
+    await _api.post(
+      'thekedar/bookings/$bookingId/payment/verify',
+      body: {
+        'razorpay_order_id': receipt.orderId,
+        'razorpay_payment_id': receipt.paymentId,
+        'razorpay_signature': receipt.signature,
+        'payment_mode': mode.wire,
+      },
+    );
+  }
+
+  @override
+  Future<String?> verifyLabourPayout(int bookingId) async => _obj(
+    await _api.post('thekedar/bookings/$bookingId/labour-payout/verify'),
+  ).strOrNull('beneficiary_name');
 
   @override
   Future<List<EndReason>> endReasons() async {
@@ -453,6 +493,7 @@ class ApiRepository implements KaamWalaRepository {
     bool? notifyPush,
     bool? notifyWhatsapp,
     bool? notifySms,
+    String? fcmToken,
   }) async {
     // The endpoint returns only the preference fields, not the `preferences`
     // wrapper `GET /account` uses — re-wrap so one parser handles both.
@@ -466,6 +507,7 @@ class ApiRepository implements KaamWalaRepository {
           'notify_push': ?notifyPush,
           'notify_whatsapp': ?notifyWhatsapp,
           'notify_sms': ?notifySms,
+          'fcm_token': ?fcmToken,
         },
       ),
     );

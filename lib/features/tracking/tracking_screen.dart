@@ -15,6 +15,7 @@ import '../../widgets/kw_button.dart';
 import '../../widgets/kw_celebration.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
+import '../booking_detail/widgets/payment_sheet.dart';
 import 'widgets/arrival_sheet.dart';
 import 'widgets/end_job_sheet.dart';
 import 'widgets/tracking_map.dart';
@@ -41,6 +42,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
   /// deciding it was already old news when the screen opened.
   bool _acceptSettled = false;
 
+  /// Set once the payment sheet has opened on this screen — it offers itself
+  /// once, and the booking screen keeps the button after that.
+  bool _paymentOffered = false;
+
   @override
   void initState() {
     super.initState();
@@ -49,14 +54,62 @@ class _TrackingScreenState extends State<TrackingScreen> {
       bookingId: widget.booking.id,
     )
       ..addListener(_watchForAccept)
+      ..addListener(_watchForFinish)
       ..start();
   }
 
   @override
   void dispose() {
     _session.removeListener(_watchForAccept);
+    _session.removeListener(_watchForFinish);
     _session.dispose();
     super.dispose();
+  }
+
+  /// The worker closing the kaam from their side lands here on a poll, like
+  /// the accept does — and it is the moment to settle the money.
+  void _watchForFinish() {
+    final latest = _session.latest;
+    final previous = _session.previous;
+    if (latest == null || previous == null) return;
+    if (previous.stage == JobStage.completed ||
+        latest.stage != JobStage.completed) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _offerPayment();
+    });
+  }
+
+  /// Opens the payment sheet if the money is still owed. The worker may have
+  /// taken cash on their side already, which settles it — so it asks first.
+  Future<void> _offerPayment() async {
+    if (_paymentOffered) return;
+    final BookingDetail detail;
+    try {
+      detail = await context.repo.bookingDetail(widget.booking.id);
+    } on Object catch (_) {
+      // Only an offer: the booking screen has the button as well.
+      return;
+    }
+    if (!mounted || !detail.can.markPayment) return;
+    // Only the screen on top gets to interrupt; and re-checked after the
+    // fetch, since the poll and the "kaam poora" button can both get here.
+    if (_paymentOffered || ModalRoute.of(context)?.isCurrent != true) return;
+    _paymentOffered = true;
+
+    final via = await PaymentSheet.show(
+      context,
+      bookingId: widget.booking.id,
+      detail: detail,
+    );
+    if (!mounted || via == null) return;
+    await PaymentSheet.celebrate(
+      context,
+      via,
+      workerName: detail.labour.name,
+      amount: detail.payment.amount,
+    );
   }
 
   /// The worker saying yes is the one event on this screen nobody taps for — it
@@ -408,7 +461,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
     } on Object catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text(describeError(context, e))));
+      return;
     }
+    // Kaam done, so straight on to paying for it.
+    if (mounted) await _offerPayment();
   }
 
   /// Opens the "stop this kaam" sheet, and pulls one more sample so the card

@@ -8,6 +8,7 @@ import 'package:kaamwala_thekedar/features/account/account_screen.dart';
 import 'package:kaamwala_thekedar/features/auth/login_screen.dart';
 import 'package:kaamwala_thekedar/features/auth/otp_screen.dart';
 import 'package:kaamwala_thekedar/features/booking_detail/booking_detail_screen.dart';
+import 'package:kaamwala_thekedar/features/booking_detail/widgets/payment_sheet.dart';
 import 'package:kaamwala_thekedar/features/bookings/bookings_screen.dart';
 import 'package:kaamwala_thekedar/features/labour_detail/labour_detail_screen.dart';
 import 'package:kaamwala_thekedar/features/profile/profile_screen.dart';
@@ -104,6 +105,52 @@ void main() {
       'Booking detail',
       () => const BookingDetailScreen(bookingId: 101),
     );
+  });
+
+  group('Payment sheet', () {
+    // On its own rather than over the booking screen, so this checks the
+    // sheet alone. Both sides are walked, since each lays out its own section:
+    // 103's worker is paid into a bank account, 104's into a UPI id.
+    for (final bookingId in [103, 104]) {
+      for (final textScale in [1.0, 1.3]) {
+        for (final entry in _viewports.entries) {
+          testWidgets(
+            'booking $bookingId at ${textScale}x renders clean at ${entry.key}',
+            (tester) async {
+              tester.view.physicalSize = entry.value;
+              tester.view.devicePixelRatio = 1.0;
+              addTearDown(tester.view.reset);
+
+              await tester.pumpWidget(
+                _host(
+                  Scaffold(
+                    body: Builder(
+                      builder: (context) => Center(
+                        child: TextButton(
+                          onPressed: () =>
+                              PaymentSheet.show(context, bookingId: bookingId),
+                          child: const Text('open'),
+                        ),
+                      ),
+                    ),
+                  ),
+                  entry.value,
+                  textScale: textScale,
+                ),
+              );
+              await tester.tap(find.text('open'));
+              await tester.pumpAndSettle();
+
+              for (final side in ['Online', 'Offline']) {
+                await tester.tap(find.text(side));
+                await tester.pumpAndSettle();
+                expect(tester.takeException(), isNull, reason: side);
+              }
+            },
+          );
+        }
+      }
+    }
   });
 
   group('Profile', () {

@@ -413,11 +413,6 @@ class AppStrings {
       '$name ka kaam poora mark kar denge. Unse confirm karne ko kaha jayega.';
   String get yesWorkDone => 'Haan, poora hua';
   String get workDoneMarked => 'Kaam poora mark kar diya';
-  String get markPaymentDone => 'Payment done';
-  String get markPaymentTitle => 'Paisa de diya?';
-  String markPaymentMessage(String name, int amount) =>
-      '₹$amount $name ko de diya — record ho jayega aur unse confirm karne ko kaha jayega.';
-  String get yesPaid => 'Haan, de diya';
   String get paymentDoneMarked => 'Payment done mark kar diya';
   String get notYet => 'Abhi nahi';
   String get paymentDone => 'Payment done';
@@ -489,6 +484,61 @@ class AppStrings {
   String get openFullProfile => 'Poori profile dekhein';
   String get amountToPay => 'Dena hai';
   String get amountPaid => 'De diya';
+  String get payoutUpiChip => 'UPI se Payment Available';
+  String get payoutBankChip => 'Bank Transfer Available';
+  String get payoutUpiIdLabel => 'UPI ID';
+  String get payoutCopyUpi => 'Copy Karein';
+  String get payoutCopied => 'UPI ID copy ho gayi';
+  String get payoutBankNameLabel => 'Bank';
+  String get payoutAccountHolderLabel => 'Account Holder';
+  String get payoutAccountNumberLabel => 'Account Number';
+  String get payoutIfscLabel => 'IFSC Code';
+  String get payoutVerifiedBadge => 'Verified ✔';
+  String get payoutUnverifiedBadge => 'Abhi verify nahi hua';
+
+  // ── Paying the worker (the sheet that opens once the kaam is done) ────────
+  // Two sides: Offline is cash in hand, marked here and confirmed by the worker;
+  // Online goes through Razorpay to the UPI id, QR or bank account the worker
+  // saved in their own app.
+  String get payNow => 'Payment karein';
+  String paySheetSubtitle(String name, int amount) =>
+      '$name ko ₹$amount dene hain';
+  String get payChooseMode => 'Payment mode chunein';
+  String get payOffline => 'Offline';
+  String get payOfflineHint => 'Cash, haath mein';
+  String get payOnline => 'Online';
+  String get payOnlineHint => 'UPI · Bank · QR';
+  String payLabourAsked(String name, String how) =>
+      '$name ne $how se payment maanga hai';
+  String get payOnlineRequested => 'Online maanga gaya hai';
+  String get payOnlineOff => 'Abhi chalu nahi';
+  String get payOnlineAppOnly => 'Sirf mobile app mein';
+  String get payNoDetails => 'Details nahi di';
+  String payOfflineNote(String name) =>
+      'Cash seedha $name ke haath mein dein. Unse bhi confirm karaya jayega.';
+  String payOfflineConfirm(int amount) => 'Haan, ₹$amount cash de diya';
+  String payWhereTo(String name) => '$name ko kahan bhejein?';
+  String get payModeUpi => 'UPI ID';
+  String get payModeBank => 'Bank Account';
+  String get payModeQr => 'QR Code';
+  String get payQrSubtitle => 'Kaam wale ka UPI QR';
+  String get payNotAdded => 'Add nahi kiya';
+  String get payNotVerified => 'Verify nahi hua';
+  String get payRecheck => 'Abhi verify karein';
+  String payRecheckNote(String name) =>
+      '$name ki details Razorpay se verify honi baaki hain.';
+  String get payQrNote => 'Paisa isi QR wale UPI account mein jayega';
+  String get payBeneficiary => 'Account par naam';
+  String payOnlineButton(int amount) => '₹$amount Pay karein';
+  String payOnlineNote(String name) =>
+      'Razorpay se surakshit payment — paisa KaamWala ke through $name tak pahunchega.';
+  String get payCancelled => 'Payment cancel ho gaya. Koi paisa nahi kata.';
+  String get payFailed => 'Payment nahi ho paya. Dobara try karein.';
+  String get payVerifyPending =>
+      'Payment ho gaya lagta hai, par confirm nahi ho paya. Dobara pay mat karein — "Dobara confirm karein" dabayein.';
+  String get payConfirmAgain => 'Dobara confirm karein';
+  String celebrateOnlinePaymentBody(String name) =>
+      'Online payment ho gaya. Paisa $name ke account mein bheja ja raha hai.';
   String offeredWas(int amount) => 'Pehle ₹$amount offer kiya tha';
   String get nothingHappenedYet => 'Is booking par abhi kuch hua nahi';
   String get workedForLabel => 'Kaam hua';
@@ -1212,15 +1262,6 @@ class _Hindi extends AppStrings {
   @override
   String get workDoneMarked => 'काम पूरा मार्क कर दिया';
   @override
-  String get markPaymentDone => 'पेमेंट डन';
-  @override
-  String get markPaymentTitle => 'पैसा दे दिया?';
-  @override
-  String markPaymentMessage(String name, int amount) =>
-      '₹$amount $name को दे दिया — रिकॉर्ड हो जाएगा और उनसे कन्फर्म करने को कहा जाएगा।';
-  @override
-  String get yesPaid => 'हाँ, दे दिया';
-  @override
   String get paymentDoneMarked => 'पेमेंट डन मार्क कर दिया';
   @override
   String get notYet => 'अभी नहीं';
@@ -1310,6 +1351,97 @@ class _Hindi extends AppStrings {
   String get amountToPay => 'देना है';
   @override
   String get amountPaid => 'दे दिया';
+  @override
+  String get payoutUpiChip => 'UPI से पेमेंट उपलब्ध';
+  @override
+  String get payoutBankChip => 'बैंक ट्रांसफर उपलब्ध';
+  @override
+  String get payoutUpiIdLabel => 'UPI आईडी';
+  @override
+  String get payoutCopyUpi => 'कॉपी करें';
+  @override
+  String get payoutCopied => 'UPI आईडी कॉपी हो गई';
+  @override
+  String get payoutBankNameLabel => 'बैंक';
+  @override
+  String get payoutAccountHolderLabel => 'खाताधारक';
+  @override
+  String get payoutAccountNumberLabel => 'खाता संख्या';
+  @override
+  String get payoutIfscLabel => 'IFSC कोड';
+  @override
+  String get payoutVerifiedBadge => 'वेरिफाइड ✔';
+  @override
+  String get payoutUnverifiedBadge => 'अभी वेरिफाई नहीं हुआ';
+  @override
+  String get payNow => 'पेमेंट करें';
+  @override
+  String paySheetSubtitle(String name, int amount) =>
+      '$name को ₹$amount देने हैं';
+  @override
+  String get payChooseMode => 'पेमेंट मोड चुनें';
+  @override
+  String get payOffline => 'ऑफ़लाइन';
+  @override
+  String get payOfflineHint => 'कैश, हाथ में';
+  @override
+  String get payOnline => 'ऑनलाइन';
+  @override
+  String payLabourAsked(String name, String how) =>
+      '$name ने $how से पेमेंट माँगा है';
+  @override
+  String get payOnlineRequested => 'ऑनलाइन माँगा गया है';
+  @override
+  String get payOnlineOff => 'अभी चालू नहीं';
+  @override
+  String get payOnlineAppOnly => 'सिर्फ़ मोबाइल ऐप में';
+  @override
+  String get payNoDetails => 'डिटेल्स नहीं दीं';
+  @override
+  String payOfflineNote(String name) =>
+      'कैश सीधे $name के हाथ में दें। उनसे भी कन्फ़र्म कराया जाएगा।';
+  @override
+  String payOfflineConfirm(int amount) => 'हाँ, ₹$amount कैश दे दिया';
+  @override
+  String payWhereTo(String name) => '$name को कहाँ भेजें?';
+  @override
+  String get payModeUpi => 'UPI आईडी';
+  @override
+  String get payModeBank => 'बैंक खाता';
+  @override
+  String get payModeQr => 'QR कोड';
+  @override
+  String get payQrSubtitle => 'काम वाले का UPI QR';
+  @override
+  String get payNotAdded => 'ऐड नहीं किया';
+  @override
+  String get payNotVerified => 'वेरिफाई नहीं हुआ';
+  @override
+  String get payRecheck => 'अभी वेरिफाई करें';
+  @override
+  String payRecheckNote(String name) =>
+      '$name की डिटेल्स Razorpay से वेरिफाई होनी बाकी हैं।';
+  @override
+  String get payQrNote => 'पैसा इसी QR वाले UPI खाते में जाएगा';
+  @override
+  String get payBeneficiary => 'खाते पर नाम';
+  @override
+  String payOnlineButton(int amount) => '₹$amount पे करें';
+  @override
+  String payOnlineNote(String name) =>
+      'Razorpay से सुरक्षित पेमेंट — पैसा KaamWala के ज़रिए $name तक पहुँचेगा।';
+  @override
+  String get payCancelled => 'पेमेंट कैंसल हो गया। कोई पैसा नहीं कटा।';
+  @override
+  String get payFailed => 'पेमेंट नहीं हो पाया। दोबारा कोशिश करें।';
+  @override
+  String get payVerifyPending =>
+      'लगता है पेमेंट हो गया, पर कन्फ़र्म नहीं हो पाया। दोबारा पे न करें — "दोबारा कन्फ़र्म करें" दबाएँ।';
+  @override
+  String get payConfirmAgain => 'दोबारा कन्फ़र्म करें';
+  @override
+  String celebrateOnlinePaymentBody(String name) =>
+      'ऑनलाइन पेमेंट हो गया। पैसा $name के खाते में भेजा जा रहा है।';
   @override
   String offeredWas(int amount) => 'पहले ₹$amount ऑफ़र किया था';
   @override
@@ -2109,15 +2241,6 @@ class _English extends AppStrings {
   @override
   String get workDoneMarked => 'Marked the work complete';
   @override
-  String get markPaymentDone => 'Payment done';
-  @override
-  String get markPaymentTitle => 'Has the payment been made?';
-  @override
-  String markPaymentMessage(String name, int amount) =>
-      'Paid ₹$amount to $name — this is recorded and they will be asked to confirm it.';
-  @override
-  String get yesPaid => 'Yes, paid';
-  @override
   String get paymentDoneMarked => 'Marked the payment done';
   @override
   String get notYet => 'Not yet';
@@ -2207,6 +2330,90 @@ class _English extends AppStrings {
   String get amountToPay => 'To pay';
   @override
   String get amountPaid => 'Paid';
+  @override
+  String get payoutUpiChip => 'UPI payment available';
+  @override
+  String get payoutBankChip => 'Bank transfer available';
+  @override
+  String get payoutUpiIdLabel => 'UPI ID';
+  @override
+  String get payoutCopyUpi => 'Copy';
+  @override
+  String get payoutCopied => 'UPI ID copied';
+  @override
+  String get payoutBankNameLabel => 'Bank';
+  @override
+  String get payoutAccountHolderLabel => 'Account holder';
+  @override
+  String get payoutAccountNumberLabel => 'Account number';
+  @override
+  String get payoutIfscLabel => 'IFSC code';
+  @override
+  String get payoutVerifiedBadge => 'Verified ✔';
+  @override
+  String get payoutUnverifiedBadge => 'Not verified yet';
+  @override
+  String get payNow => 'Pay now';
+  @override
+  String paySheetSubtitle(String name, int amount) => 'You owe $name ₹$amount';
+  @override
+  String get payChooseMode => 'Choose payment mode';
+  @override
+  String get payOfflineHint => 'Cash, in hand';
+  @override
+  String payLabourAsked(String name, String how) =>
+      '$name asked to be paid by $how';
+  @override
+  String get payOnlineRequested => 'Online requested';
+  @override
+  String get payOnlineOff => 'Not available yet';
+  @override
+  String get payOnlineAppOnly => 'Mobile app only';
+  @override
+  String get payNoDetails => 'No details added';
+  @override
+  String payOfflineNote(String name) =>
+      'Hand the cash straight to $name. They will be asked to confirm it too.';
+  @override
+  String payOfflineConfirm(int amount) => 'Yes, paid ₹$amount in cash';
+  @override
+  String payWhereTo(String name) => 'Where should $name get it?';
+  @override
+  String get payModeBank => 'Bank account';
+  @override
+  String get payModeQr => 'QR code';
+  @override
+  String get payQrSubtitle => "Worker's UPI QR";
+  @override
+  String get payNotAdded => 'Not added';
+  @override
+  String get payNotVerified => 'Not verified';
+  @override
+  String get payRecheck => 'Verify now';
+  @override
+  String payRecheckNote(String name) =>
+      "$name's details haven't been verified by Razorpay yet.";
+  @override
+  String get payQrNote => "The money goes to this QR's UPI account";
+  @override
+  String get payBeneficiary => 'Name on account';
+  @override
+  String payOnlineButton(int amount) => 'Pay ₹$amount';
+  @override
+  String payOnlineNote(String name) =>
+      'Secure payment via Razorpay — KaamWala passes the money on to $name.';
+  @override
+  String get payCancelled => 'Payment cancelled. Nothing was charged.';
+  @override
+  String get payFailed => "The payment didn't go through. Try again.";
+  @override
+  String get payVerifyPending =>
+      "Looks like the payment went through but couldn't be confirmed. Don't pay again — tap \"Confirm again\".";
+  @override
+  String get payConfirmAgain => 'Confirm again';
+  @override
+  String celebrateOnlinePaymentBody(String name) =>
+      'Paid online. The money is on its way to $name.';
   @override
   String offeredWas(int amount) => 'Originally offered ₹$amount';
   @override
@@ -2830,15 +3037,6 @@ class _Bhojpuri extends _Hindi {
   @override
   String get workDoneMarked => 'काम पूरा मार्क कर देहनी';
   @override
-  String get markPaymentDone => 'पेमेंट डन';
-  @override
-  String get markPaymentTitle => 'पइसा दे देहनी?';
-  @override
-  String markPaymentMessage(String name, int amount) =>
-      '₹$amount $name के दे देहनी — रिकॉर्ड हो जाई आ उनसे कन्फर्म करे के कहल जाई।';
-  @override
-  String get yesPaid => 'हँ, दे देहनी';
-  @override
   String get paymentDoneMarked => 'पेमेंट डन मार्क कर देहनी';
   @override
   String get notYet => 'अभी ना';
@@ -2920,6 +3118,85 @@ class _Bhojpuri extends _Hindi {
   String get amountToPay => 'देवे के बा';
   @override
   String get amountPaid => 'दे देहनी';
+  @override
+  String get payoutUpiChip => 'UPI से पेमेंट उपलब्ध बा';
+  @override
+  String get payoutBankChip => 'बैंक ट्रांसफर उपलब्ध बा';
+  @override
+  String get payoutUpiIdLabel => 'UPI आईडी';
+  @override
+  String get payoutCopyUpi => 'कॉपी करीं';
+  @override
+  String get payoutCopied => 'UPI आईडी कॉपी हो गइल';
+  @override
+  String get payoutBankNameLabel => 'बैंक';
+  @override
+  String get payoutAccountHolderLabel => 'खाताधारी';
+  @override
+  String get payoutAccountNumberLabel => 'खाता नंबर';
+  @override
+  String get payoutIfscLabel => 'IFSC कोड';
+  @override
+  String get payoutVerifiedBadge => 'वेरिफाइड ✔';
+  @override
+  String get payoutUnverifiedBadge => 'अबहीं वेरिफाई ना भइल';
+  @override
+  String get payNow => 'पेमेंट करीं';
+  @override
+  String paySheetSubtitle(String name, int amount) =>
+      '$name के ₹$amount देवे के बा';
+  @override
+  String get payChooseMode => 'पेमेंट मोड चुनीं';
+  @override
+  String payLabourAsked(String name, String how) =>
+      '$name $how से पेमेंट माँगले बाड़ें';
+  @override
+  String get payOnlineRequested => 'ऑनलाइन माँगल गइल बा';
+  @override
+  String get payOnlineOff => 'अबहीं चालू ना बा';
+  @override
+  String get payOnlineAppOnly => 'खाली मोबाइल ऐप में';
+  @override
+  String get payNoDetails => 'डिटेल्स ना देले बाड़ें';
+  @override
+  String payOfflineNote(String name) =>
+      'कैश सीधे $name के हाथ में दीं। उनहूँ से कन्फ़र्म करावल जाई।';
+  @override
+  String payOfflineConfirm(int amount) => 'हँ, ₹$amount कैश दे देहनी';
+  @override
+  String payWhereTo(String name) => '$name के कहाँ भेजीं?';
+  @override
+  String get payQrSubtitle => 'काम वाला के UPI QR';
+  @override
+  String get payNotAdded => 'ऐड ना कइले बाड़ें';
+  @override
+  String get payNotVerified => 'वेरिफाई ना भइल';
+  @override
+  String get payRecheck => 'अबहीं वेरिफाई करीं';
+  @override
+  String payRecheckNote(String name) =>
+      '$name के डिटेल्स Razorpay से वेरिफाई होखे के बाकी बा।';
+  @override
+  String get payQrNote => 'पइसा एही QR वाला UPI खाता में जाई';
+  @override
+  String get payBeneficiary => 'खाता पर नाम';
+  @override
+  String payOnlineButton(int amount) => '₹$amount पे करीं';
+  @override
+  String payOnlineNote(String name) =>
+      'Razorpay से सुरक्षित पेमेंट — पइसा KaamWala के जरिए $name तक पहुँची।';
+  @override
+  String get payCancelled => 'पेमेंट कैंसल हो गइल। कवनो पइसा ना कटल।';
+  @override
+  String get payFailed => 'पेमेंट ना हो पावल। फेर से कोशिश करीं।';
+  @override
+  String get payVerifyPending =>
+      'लागता पेमेंट हो गइल, बाकिर कन्फ़र्म ना हो पावल। फेर से पे मत करीं — "फेर से कन्फ़र्म करीं" दबाईं।';
+  @override
+  String get payConfirmAgain => 'फेर से कन्फ़र्म करीं';
+  @override
+  String celebrateOnlinePaymentBody(String name) =>
+      'ऑनलाइन पेमेंट हो गइल। पइसा $name के खाता में भेजल जा रहल बा।';
   @override
   String offeredWas(int amount) => 'पहिले ₹$amount ऑफ़र कइल रहे';
   @override

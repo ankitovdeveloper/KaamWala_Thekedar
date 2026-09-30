@@ -640,6 +640,148 @@ void main() {
     });
   });
 
+  group('Payment', () {
+    Map<String, Object?> finished({
+      String? mode,
+      Map<String, Object?> can = const {},
+      Map<String, Object?>? payout,
+    }) => {
+      'id': 21,
+      'status': 'completed',
+      'job_stage': 'completed',
+      'offered_amount': 800,
+      'payment_status': 'pending',
+      'payment_mode': mode,
+      'labour': {'id': 3, 'name': 'Ramesh Kumar'},
+      'payment': {'amount': 800},
+      'outcome': {'kind': 'completed'},
+      'can': {'mark_payment': true, ...can},
+      'labour_payout': payout,
+    };
+
+    test('reads which sides and destinations the sheet may offer', () async {
+      final (:repo, client: _) = _build(
+        (_) => (
+          status: 200,
+          body: _ok(
+            finished(
+              mode: 'upi',
+              can: {'pay_offline': false, 'pay_online': true},
+              payout: {
+                'has_payment_mode': true,
+                'payout_method': 'upi',
+                'verification_status': 'verified',
+                'upi_id': 'ramesh@ybl',
+                'upi_qr_url': 'https://example.test/qr.png',
+                'beneficiary_name': 'RAMESH KUMAR',
+              },
+            ),
+          ),
+        ),
+      );
+
+      final detail = await repo.bookingDetail(21);
+      final payout = detail.labourPayout!;
+
+      expect(detail.booking.labourAskedOnline, isTrue);
+      expect(detail.can.payOffline, isFalse);
+      expect(detail.can.payOnline, isTrue);
+      expect(payout.readyFor(OnlinePayMode.upi), isTrue);
+      expect(payout.readyFor(OnlinePayMode.qr), isTrue);
+      expect(
+        payout.offers(OnlinePayMode.bank),
+        isFalse,
+        reason: 'a UPI worker has no bank account on file to pay into',
+      );
+    });
+
+    test('an older server without the sheet flags offers both sides', () async {
+      final (:repo, client: _) = _build(
+        (_) => (status: 200, body: _ok(finished())),
+      );
+
+      final detail = await repo.bookingDetail(21);
+
+      expect(detail.can.payOffline, isTrue);
+      expect(detail.can.payOnline, isTrue);
+      expect(detail.booking.labourAskedOnline, isFalse);
+    });
+
+    test('an unverified payout is on file but cannot take the money', () {
+      final payout = LabourPayout.fromJson(const {
+        'has_payment_mode': true,
+        'payout_method': 'bank',
+        'verification_status': 'pending',
+        'bank_name': 'SBI',
+        'account_number_masked': '****1234',
+      });
+
+      expect(payout.offers(OnlinePayMode.bank), isTrue);
+      expect(payout.readyFor(OnlinePayMode.bank), isFalse);
+      expect(
+        payout.copyWith(verificationStatus: 'verified').readyFor(
+          OnlinePayMode.bank,
+        ),
+        isTrue,
+      );
+    });
+
+    test('the order carries the picked destination, the server the amount', () async {
+      final (:repo, :client) = _build(
+        (_) => (
+          status: 200,
+          body: _ok({
+            'booking_id': 21,
+            'amount': 800,
+            'currency': 'INR',
+            'razorpay_order_id': 'order_abc123',
+            'razorpay_key_id': 'rzp_test_key',
+            'prefill': {'name': 'Amit Khurana', 'contact': '9876543210'},
+          }),
+        ),
+      );
+
+      final order = await repo.createPaymentOrder(21, mode: OnlinePayMode.qr);
+
+      expect(
+        client.lastRequest!.url.path,
+        endsWith('/thekedar/bookings/21/payment/order'),
+      );
+      expect(jsonDecode(client.lastBody), {'payment_mode': 'qr'});
+      expect(order.orderId, 'order_abc123');
+      expect(order.keyId, 'rzp_test_key');
+      expect(order.amount, 800);
+      expect(order.prefillContact, '9876543210');
+    });
+
+    test('verify sends the checkout receipt and the destination', () async {
+      final (:repo, :client) = _build(
+        (_) => (status: 200, body: _ok({'status': 'paid'})),
+      );
+
+      await repo.verifyPayment(
+        21,
+        receipt: const PaymentReceipt(
+          orderId: 'order_abc123',
+          paymentId: 'pay_xyz789',
+          signature: 'sig',
+        ),
+        mode: OnlinePayMode.upi,
+      );
+
+      expect(
+        client.lastRequest!.url.path,
+        endsWith('/thekedar/bookings/21/payment/verify'),
+      );
+      expect(jsonDecode(client.lastBody), {
+        'razorpay_order_id': 'order_abc123',
+        'razorpay_payment_id': 'pay_xyz789',
+        'razorpay_signature': 'sig',
+        'payment_mode': 'upi',
+      });
+    });
+  });
+
   group('Profile & account', () {
     test('profile bundle splits user, stats and addresses', () async {
       final (:repo, client: _) = _build(

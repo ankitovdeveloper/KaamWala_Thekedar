@@ -78,6 +78,7 @@ class MockRepository implements KaamWalaRepository {
     String countryCode = '+91',
     SignupDraft? draft,
     String? termsVersion,
+    String? fcmToken,
   }) async {
     await _delayed(null);
     // Mirrors the server's rejection path so the error UI is reachable offline.
@@ -285,11 +286,38 @@ class MockRepository implements KaamWalaRepository {
           confirmArrival: job != null && job.hasAccepted && !job.arrivalConfirmed,
           complete: booking.canComplete,
           markPayment: booking.canMarkPayment,
+          payOffline: booking.canMarkPayment && !booking.labourAskedOnline,
+          payOnline: booking.canMarkPayment && booking.paymentMode != 'cash',
           terminate: booking.isTrackable,
           review: booking.isDone && !booking.hasReview,
         ),
+        labourPayout: booking.isDone ? _mockPayout(labour) : null,
       ),
     );
+  }
+
+  /// A verified payout method per worker, alternating UPI and bank so the demo
+  /// shows both sides of the online options.
+  static LabourPayout _mockPayout(Labour labour) {
+    final handle = labour.name.split(' ').first.toLowerCase();
+    return labour.id.isEven
+        ? LabourPayout(
+            hasPaymentMode: true,
+            payoutMethod: 'upi',
+            verificationStatus: 'verified',
+            upiId: '$handle@okaxis',
+            beneficiaryName: labour.name.toUpperCase(),
+          )
+        : LabourPayout(
+            hasPaymentMode: true,
+            payoutMethod: 'bank',
+            verificationStatus: 'verified',
+            beneficiaryName: labour.name.toUpperCase(),
+            bankName: 'State Bank of India',
+            accountHolderName: labour.name,
+            accountNumberMasked: '********4821',
+            ifsc: 'SBIN0001234',
+          );
   }
 
   /// The steps the server would have built, derived from the same row.
@@ -490,8 +518,45 @@ class MockRepository implements KaamWalaRepository {
     (b) => b.copyWith(
       paymentStatus: 'completed',
       paymentMarkedAt: DateTime.now(),
+      paymentMode: 'cash',
     ),
   );
+
+  @override
+  Future<PaymentOrder> createPaymentOrder(
+    int bookingId, {
+    required OnlinePayMode mode,
+  }) {
+    final booking = _bookings.firstWhere((b) => b.id == bookingId);
+    return _delayed(
+      PaymentOrder(
+        bookingId: bookingId,
+        amount: booking.price,
+        orderId: 'order_mock_$bookingId',
+        keyId: 'rzp_test_mock',
+      ),
+    );
+  }
+
+  @override
+  Future<void> verifyPayment(
+    int bookingId, {
+    required PaymentReceipt receipt,
+    required OnlinePayMode mode,
+  }) => _patch(
+    bookingId,
+    (b) => b.copyWith(
+      paymentStatus: 'completed',
+      paymentMarkedAt: DateTime.now(),
+      paymentMode: mode.wire,
+    ),
+  );
+
+  @override
+  Future<String?> verifyLabourPayout(int bookingId) {
+    final booking = _bookings.firstWhere((b) => b.id == bookingId);
+    return _delayed(booking.labour.name.toUpperCase());
+  }
 
   /// Applies [change] to one row and hands back the updated copy — the mock's
   /// stand-in for the backend answering with the row it just wrote.
@@ -691,6 +756,7 @@ class MockRepository implements KaamWalaRepository {
     bool? notifyPush,
     bool? notifyWhatsapp,
     bool? notifySms,
+    String? fcmToken,
   }) {
     _settings = _settings.copyWith(
       language: language,

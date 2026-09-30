@@ -17,6 +17,7 @@ import '../../widgets/kw_async.dart';
 import '../../widgets/kw_celebration.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
+import '../booking_detail/widgets/payment_sheet.dart';
 import '../shell/home_shell.dart';
 import 'widgets/booking_card.dart';
 import 'widgets/booking_tabs.dart';
@@ -91,18 +92,25 @@ class _BookingsScreenState extends State<BookingsScreen>
   void _syncLive() => _live.sync(wanted: _rows.any((b) => b.isLive));
 
   /// One tick: refetch quietly, then say so if a worker set off while the
-  /// Thekedar was watching the list.
+  /// Thekedar was watching the list — or open the payment sheet if one just
+  /// finished the kaam from their side.
   Future<void> _pollLive() async {
-    final before = {for (final b in _rows) b.id: b.jobStage};
+    final before = {for (final b in _rows) b.id: b};
     await _bookings.load(silent: true);
     if (!mounted) return;
 
-    // Only the screen on top gets to interrupt, and only the first departure —
+    // Only the screen on top gets to interrupt, and only the first change —
     // a queue of these would bury the one that just happened.
     if (ModalRoute.of(context)?.isCurrent != true) return;
 
     for (final booking in _rows) {
-      if (before[booking.id] == JobStage.pending &&
+      final was = before[booking.id];
+      if (was == null) continue;
+      if (was.isLive && booking.canMarkPayment) {
+        await _pay(booking);
+        return;
+      }
+      if (was.jobStage == JobStage.pending &&
           booking.jobStage == JobStage.onTheWay) {
         _toast(context.s.labourOnTheWay(booking.labour.name));
         return;
@@ -190,7 +198,7 @@ class _BookingsScreenState extends State<BookingsScreen>
         s.yesWorkDone)) {
       return;
     }
-    await _apply(
+    final updated = await _apply(
       booking,
       (repo) => repo.completeBooking(booking.id),
       () => KwCelebration.show(
@@ -199,30 +207,34 @@ class _BookingsScreenState extends State<BookingsScreen>
         message: s.celebrateWorkDoneBody(booking.labour.name),
       ),
     );
+    // Kaam done, so straight on to paying for it.
+    if (mounted && updated != null && updated.canMarkPayment) {
+      await _pay(updated);
+    }
   }
 
-  /// "Payment done". Same reasoning, and the same prompt lands on the worker's
-  /// side — they are the ones who have to say the money actually arrived.
-  Future<void> _paymentDone(Booking booking) async {
-    final s = context.s;
-    if (!await _ask(s.markPaymentTitle,
-        s.markPaymentMessage(booking.labour.name, booking.price), s.yesPaid)) {
-      return;
-    }
-    await _apply(
-      booking,
-      (repo) => repo.markPaymentDone(booking.id),
-      () => KwCelebration.show(
-        context,
-        title: s.celebratePaymentTitle,
-        message: s.celebratePaymentBody(booking.labour.name),
-        detail: '₹${booking.price}',
-        detailIcon: Icons.payments_rounded,
-      ),
+  /// The payment sheet: Offline (cash — the worker is asked to confirm it) or
+  /// Online to their UPI id, bank account or QR. Nothing is marked by a stray
+  /// tap: the sheet asks which way first. It loads the full booking itself,
+  /// since the worker's payout details are not on the list row.
+  Future<void> _pay(Booking booking) async {
+    final via = await PaymentSheet.show(context, bookingId: booking.id);
+    if (!mounted) return;
+
+    // Refreshed whatever the answer: a checkout closed half-way may still
+    // have landed on the server through Razorpay's webhook.
+    await _bookings.load(silent: true);
+    if (!mounted || via == null) return;
+
+    await PaymentSheet.celebrate(
+      context,
+      via,
+      workerName: booking.labour.name,
+      amount: booking.price,
     );
   }
 
-  /// Yes/no dialog shared by the two wrap-up actions.
+  /// Yes/no dialog behind "kaam poora hua".
   Future<bool> _ask(String title, String message, String confirmLabel) async {
     final s = context.s;
     final answer = await showDialog<bool>(
@@ -252,27 +264,30 @@ class _BookingsScreenState extends State<BookingsScreen>
   }
 
   /// Runs one booking action, patches the row in place so it does not jump, and
-  /// refreshes quietly behind it.
+  /// refreshes quietly behind it. Hands back the updated row, or null when the
+  /// action failed (already toasted).
   ///
-  /// [announce] rather than a toast string: both callers land on a moment worth
+  /// [announce] rather than a toast string: the action lands on a moment worth
   /// a celebration, and the popup has to open *after* the row has been patched
   /// so the list behind the confetti already reads right.
-  Future<void> _apply(
+  Future<Booking?> _apply(
     Booking booking,
     Future<Booking> Function(KaamWalaRepository repo) action,
     Future<void> Function() announce,
   ) async {
     try {
       final updated = await action(context.repo);
-      if (!mounted) return;
+      if (!mounted) return null;
       _bookings.setValue([
         for (final b in _rows)
           if (b.id == booking.id) updated else b,
       ]);
       _bookings.load(silent: true);
       await announce();
+      return updated;
     } on Object catch (e) {
       if (mounted) _toast(describeError(context, e));
+      return null;
     }
   }
 
@@ -442,7 +457,7 @@ class _BookingsScreenState extends State<BookingsScreen>
               onCancel: () => _cancel(booking),
               onReview: () => _review(booking),
               onComplete: () => _complete(booking),
-              onPaymentDone: () => _paymentDone(booking),
+              onPaymentDone: () => _pay(booking),
               // The tracking screen is where a refusal or a stopped job is
               // learned about, so coming back from it is the one moment this
               // list is guaranteed to be out of date.

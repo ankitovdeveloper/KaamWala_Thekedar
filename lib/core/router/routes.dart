@@ -13,6 +13,10 @@ import '../../features/tracking/tracking_screen.dart';
 import '../theme/app_theme.dart';
 
 abstract final class Routes {
+  /// Shared with `NotificationService`'s tap handler, which has no
+  /// [BuildContext] of its own to push from.
+  static final navigatorKey = GlobalKey<NavigatorState>();
+
   /// The boot route: it reads the restored session and replaces itself with
   /// [home] or [login]. Nothing else should navigate here.
   static const splash = '/';

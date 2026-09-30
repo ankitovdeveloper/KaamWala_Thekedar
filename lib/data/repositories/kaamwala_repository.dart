@@ -43,6 +43,7 @@ abstract interface class KaamWalaRepository {
     String countryCode,
     SignupDraft? draft,
     String? termsVersion,
+    String? fcmToken,
   });
 
   /// `POST /auth/logout`
@@ -145,7 +146,32 @@ abstract interface class KaamWalaRepository {
   /// money changing hands are different events, often hours apart, and one
   /// button for both would record a payment that never happened. The backend
   /// only accepts it once the booking is completed.
+  ///
+  /// This is the *Offline* side of the payment sheet — cash, hand to hand. The
+  /// server records it as `cash` and refuses it when the worker asked to be
+  /// paid online.
   Future<Booking> markPaymentDone(int bookingId);
+
+  /// `POST /thekedar/bookings/{id}/payment/order` — opens a Razorpay order for
+  /// the booking's amount, landing on the worker's [mode] (their UPI id, QR or
+  /// bank account). Refused unless that destination is Razorpay-verified.
+  Future<PaymentOrder> createPaymentOrder(
+    int bookingId, {
+    required OnlinePayMode mode,
+  });
+
+  /// `POST /thekedar/bookings/{id}/payment/verify` — hands Checkout's receipt
+  /// to the server, whose signature check is what actually marks it paid.
+  Future<void> verifyPayment(
+    int bookingId, {
+    required PaymentReceipt receipt,
+    required OnlinePayMode mode,
+  });
+
+  /// `POST /thekedar/bookings/{id}/labour-payout/verify` — a fresh Razorpay
+  /// check of the worker's payout details, right before paying. Returns the
+  /// name Razorpay has on the account; throws [ApiException] when it fails.
+  Future<String?> verifyLabourPayout(int bookingId);
 
   /// `GET /thekedar/bookings/end-reasons` — the chips the "stop this kaam"
   /// sheet renders.
@@ -208,6 +234,7 @@ abstract interface class KaamWalaRepository {
     bool? notifyPush,
     bool? notifyWhatsapp,
     bool? notifySms,
+    String? fcmToken,
   });
 
   /// `GET /thekedar/addresses`

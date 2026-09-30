@@ -56,6 +56,7 @@ class _RecordingRepository extends MockRepository {
     String countryCode = '+91',
     SignupDraft? draft,
     String? termsVersion,
+    String? fcmToken,
   }) {
     verifiedWith = draft;
     verifiedTermsVersion = termsVersion;
@@ -65,6 +66,7 @@ class _RecordingRepository extends MockRepository {
       countryCode: countryCode,
       draft: draft,
       termsVersion: termsVersion,
+      fcmToken: fcmToken,
     );
   }
 }

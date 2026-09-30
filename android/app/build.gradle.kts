@@ -4,6 +4,16 @@ plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services") apply false
+}
+
+// Only applied once the real `google-services.json` (from Firebase console →
+// Project settings → download for this app's package name) is dropped in —
+// the plugin itself hard-fails the build when that file is missing, and push
+// notifications are meant to degrade gracefully until then, not break local
+// builds for everyone else on the team.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 // The Maps SDK reads its key from the manifest, so `--dart-define` cannot reach
@@ -29,6 +39,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications uses java.time APIs under the hood on
+        // API levels below 33 and needs this to link against them.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -61,4 +74,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

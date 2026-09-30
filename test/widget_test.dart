@@ -188,7 +188,7 @@ void main() {
 
       // The finished ones are below the fold on a phone.
       await scrollBookings(tester);
-      expect(find.text('Payment done'), findsWidgets);
+      expect(find.text('Payment karein'), findsWidgets);
       expect(find.text('Payment baaki'), findsWidgets);
     });
 
@@ -220,16 +220,44 @@ void main() {
       await tester.pumpAndSettle();
       await scrollBookings(tester);
 
-      await tester.tap(find.text('Payment done').first);
+      await tester.tap(find.text('Payment karein').first);
       await tester.pumpAndSettle();
 
-      expect(find.text('Paisa de diya?'), findsOneWidget);
-      await tester.tap(find.text('Abhi nahi'));
+      // The sheet asks how first — nothing is marked by opening it.
+      expect(find.text('Payment mode chunein'), findsOneWidget);
+      await tester.tapAt(const Offset(20, 20)); // the scrim, above the sheet
       await tester.pumpAndSettle();
 
       // Backed out, so the row still offers it and still reads as unpaid.
-      expect(find.text('Payment done'), findsWidgets);
+      expect(find.text('Payment mode chunein'), findsNothing);
+      expect(find.text('Payment karein'), findsWidgets);
       expect(find.text('Payment baaki'), findsWidgets);
+    });
+
+    testWidgets('paying from the list goes through the same sheet', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host(const BookingsScreen()));
+      await tester.pumpAndSettle();
+      await scrollBookings(tester);
+
+      final chips = find.text('Payment karein');
+      final before = chips.evaluate().length;
+
+      await tester.tap(chips.first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Offline'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('cash de diya'));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payment ho gaya!'), findsOneWidget);
+      await tester.tap(find.text('Theek hai'));
+      await tester.pumpAndSettle();
+
+      // One row fewer asking for the money.
+      expect(find.text('Payment karein').evaluate().length, before - 1);
     });
   });
 

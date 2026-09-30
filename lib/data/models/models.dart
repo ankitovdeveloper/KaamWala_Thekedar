@@ -555,6 +555,7 @@ class Booking {
     this.paymentStatus = 'pending',
     this.paymentMarkedAt,
     this.paymentConfirmedAt,
+    this.paymentMode,
     this.completionResponse,
     this.completionRemark,
   });
@@ -596,6 +597,15 @@ class Booking {
   /// arrived. Two facts, not one — which is the whole point of keeping both.
   final DateTime? paymentMarkedAt;
   final DateTime? paymentConfirmedAt;
+
+  /// `cash` | `bank` | `upi` | `qr` — how the worker asked to be paid when they
+  /// closed the kaam themselves, or how this Thekedar paid once it is settled.
+  /// Null on a job the Thekedar closed and has not paid yet: theirs to choose.
+  final String? paymentMode;
+
+  /// The worker asked for the money through the app, not in hand — which is
+  /// why the Offline side of the payment sheet is not offered to them.
+  bool get labourAskedOnline => OnlinePayMode.parse(paymentMode) != null;
 
   /// What the worker answered when asked to sign the job off: 'agreed',
   /// 'disputed', or null while they have not answered.
@@ -640,6 +650,7 @@ class Booking {
       paymentStatus: json.strOrNull('payment_status') ?? 'pending',
       paymentMarkedAt: json.date('payment_marked_at'),
       paymentConfirmedAt: json.date('payment_confirmed_at'),
+      paymentMode: json.strOrNull('payment_mode'),
       completionResponse: json.strOrNull('completion_response'),
       completionRemark: json.strOrNull('completion_remark'),
     );
@@ -729,6 +740,7 @@ class Booking {
     String? paymentStatus,
     DateTime? paymentMarkedAt,
     DateTime? paymentConfirmedAt,
+    String? paymentMode,
     String? completionResponse,
     String? completionRemark,
   }) => Booking(
@@ -752,6 +764,7 @@ class Booking {
     paymentStatus: paymentStatus ?? this.paymentStatus,
     paymentMarkedAt: paymentMarkedAt ?? this.paymentMarkedAt,
     paymentConfirmedAt: paymentConfirmedAt ?? this.paymentConfirmedAt,
+    paymentMode: paymentMode ?? this.paymentMode,
     completionResponse: completionResponse ?? this.completionResponse,
     completionRemark: completionRemark ?? this.completionRemark,
   );
@@ -1155,6 +1168,8 @@ class BookingActions {
     this.confirmArrival = false,
     this.complete = false,
     this.markPayment = false,
+    this.payOffline = false,
+    this.payOnline = false,
     this.terminate = false,
     this.review = false,
   });
@@ -1163,19 +1178,189 @@ class BookingActions {
   final bool track;
   final bool confirmArrival;
   final bool complete;
+
+  /// The money is still owed — what opens the payment sheet at all.
   final bool markPayment;
+
+  /// The two sides of that sheet. Offline is refused once the worker asked to
+  /// be paid online; online needs Razorpay set up on the server.
+  final bool payOffline;
+  final bool payOnline;
+
   final bool terminate;
   final bool review;
 
-  factory BookingActions.fromJson(Map<String, dynamic> json) => BookingActions(
-    cancel: json.flag('cancel'),
-    track: json.flag('track'),
-    confirmArrival: json.flag('confirm_arrival'),
-    complete: json.flag('complete'),
-    markPayment: json.flag('mark_payment'),
-    terminate: json.flag('terminate'),
-    review: json.flag('review'),
+  factory BookingActions.fromJson(Map<String, dynamic> json) {
+    final markPayment = json.flag('mark_payment');
+    return BookingActions(
+      cancel: json.flag('cancel'),
+      track: json.flag('track'),
+      confirmArrival: json.flag('confirm_arrival'),
+      complete: json.flag('complete'),
+      markPayment: markPayment,
+      // A server from before the payment sheet sends neither: both sides are
+      // offered, and the endpoint behind a wrong one says why in its own words.
+      payOffline: json.flag('pay_offline', markPayment),
+      payOnline: json.flag('pay_online', markPayment),
+      terminate: json.flag('terminate'),
+      review: json.flag('review'),
+    );
+  }
+}
+
+/// How to actually pay the worker, once their kaam is marked complete.
+///
+/// Sent by the backend only for a completed booking, and only ever carries the
+/// real UPI id / QR — a UPI id is meant to be handed to whoever is paying you.
+/// The bank account number is never sent in full, only the masked form; a bank
+/// payout still goes through the in-app Razorpay flow instead of a manual
+/// transfer.
+@immutable
+class LabourPayout {
+  const LabourPayout({
+    required this.hasPaymentMode,
+    this.payoutMethod,
+    this.verificationStatus,
+    this.upiId,
+    this.upiQrUrl,
+    this.beneficiaryName,
+    this.bankName,
+    this.accountHolderName,
+    this.accountNumberMasked,
+    this.ifsc,
+  });
+
+  final bool hasPaymentMode;
+
+  /// 'bank' | 'upi' | null when [hasPaymentMode] is false.
+  final String? payoutMethod;
+
+  /// 'pending' | 'verified' | 'failed'.
+  final String? verificationStatus;
+
+  final String? upiId;
+  final String? upiQrUrl;
+  final String? beneficiaryName;
+  final String? bankName;
+  final String? accountHolderName;
+  final String? accountNumberMasked;
+  final String? ifsc;
+
+  bool get isUpi => payoutMethod == 'upi';
+  bool get isBank => payoutMethod == 'bank';
+  bool get isVerified => verificationStatus == 'verified';
+
+  /// Whether the worker has this destination on file at all. UPI id and QR
+  /// both live under the `upi` method — a QR is just how the id got entered.
+  bool offers(OnlinePayMode mode) => switch (mode) {
+    OnlinePayMode.upi => isUpi && (upiId?.isNotEmpty ?? false),
+    OnlinePayMode.qr => isUpi && (upiQrUrl?.isNotEmpty ?? false),
+    OnlinePayMode.bank => isBank,
+  };
+
+  /// On file *and* checked by Razorpay — `LabourProfile::readyForPaymentMode`,
+  /// which is what the order endpoint holds the payment to.
+  bool readyFor(OnlinePayMode mode) => offers(mode) && isVerified;
+
+  LabourPayout copyWith({String? verificationStatus, String? beneficiaryName}) =>
+      LabourPayout(
+        hasPaymentMode: hasPaymentMode,
+        payoutMethod: payoutMethod,
+        verificationStatus: verificationStatus ?? this.verificationStatus,
+        upiId: upiId,
+        upiQrUrl: upiQrUrl,
+        beneficiaryName: beneficiaryName ?? this.beneficiaryName,
+        bankName: bankName,
+        accountHolderName: accountHolderName,
+        accountNumberMasked: accountNumberMasked,
+        ifsc: ifsc,
+      );
+
+  factory LabourPayout.fromJson(Map<String, dynamic> json) => LabourPayout(
+    hasPaymentMode: json.flag('has_payment_mode'),
+    payoutMethod: json.strOrNull('payout_method'),
+    verificationStatus: json.strOrNull('verification_status'),
+    upiId: json.strOrNull('upi_id'),
+    upiQrUrl: json.strOrNull('upi_qr_url'),
+    beneficiaryName: json.strOrNull('beneficiary_name'),
+    bankName: json.strOrNull('bank_name'),
+    accountHolderName: json.strOrNull('account_holder_name'),
+    accountNumberMasked: json.strOrNull('account_number_masked'),
+    ifsc: json.strOrNull('ifsc'),
   );
+}
+
+/// Where an online payment for a booking lands — one of the worker's saved
+/// payout methods. The wire codes are `Booking::PAYMENT_MODE_*`, less `cash`.
+enum OnlinePayMode {
+  upi('upi'),
+  bank('bank'),
+  qr('qr');
+
+  const OnlinePayMode(this.wire);
+  final String wire;
+
+  static OnlinePayMode? parse(String? v) =>
+      values.where((m) => m.wire == v).firstOrNull;
+
+  String labelIn(AppStrings s) => switch (this) {
+    upi => s.payModeUpi,
+    bank => s.payModeBank,
+    qr => s.payModeQr,
+  };
+}
+
+/// `POST /thekedar/bookings/{id}/payment/order` — a Razorpay order for the
+/// booking's final amount, which the server works out; the app never sends it.
+@immutable
+class PaymentOrder {
+  const PaymentOrder({
+    required this.bookingId,
+    required this.amount,
+    required this.orderId,
+    required this.keyId,
+    this.currency = 'INR',
+    this.prefillName,
+    this.prefillContact,
+  });
+
+  final int bookingId;
+
+  /// Rupees. Razorpay Checkout wants paise, which is the gateway's to convert.
+  final int amount;
+  final String currency;
+  final String orderId;
+  final String keyId;
+  final String? prefillName;
+  final String? prefillContact;
+
+  factory PaymentOrder.fromJson(Map<String, dynamic> json) {
+    final prefill = json.mapOrNull('prefill') ?? const {};
+    return PaymentOrder(
+      bookingId: json.intVal('booking_id'),
+      amount: json.intVal('amount'),
+      currency: json.strOrNull('currency') ?? 'INR',
+      orderId: json.str('razorpay_order_id'),
+      keyId: json.str('razorpay_key_id'),
+      prefillName: prefill.strOrNull('name'),
+      prefillContact: prefill.strOrNull('contact'),
+    );
+  }
+}
+
+/// What Razorpay Checkout hands back on success — only proof once the server
+/// has checked the signature (`POST .../payment/verify`).
+@immutable
+class PaymentReceipt {
+  const PaymentReceipt({
+    required this.orderId,
+    required this.paymentId,
+    required this.signature,
+  });
+
+  final String orderId;
+  final String paymentId;
+  final String signature;
 }
 
 /// `GET /thekedar/bookings/{id}` — one booking, whole.
@@ -1194,6 +1379,7 @@ class BookingDetail {
     required this.payment,
     required this.outcome,
     required this.can,
+    this.labourPayout,
   });
 
   final Booking booking;
@@ -1210,6 +1396,10 @@ class BookingDetail {
   final BookingOutcome outcome;
   final BookingActions can;
 
+  /// Only present once the booking is completed, and only when the worker has
+  /// actually saved a payout method.
+  final LabourPayout? labourPayout;
+
   factory BookingDetail.fromJson(Map<String, dynamic> json) => BookingDetail(
     booking: Booking.fromJson(json),
     labour: Labour.fromJson(json.mapOrNull('labour') ?? const {}),
@@ -1223,6 +1413,10 @@ class BookingDetail {
     payment: BookingPayment.fromJson(json.mapOrNull('payment') ?? const {}),
     outcome: BookingOutcome.fromJson(json.mapOrNull('outcome') ?? const {}),
     can: BookingActions.fromJson(json.mapOrNull('can') ?? const {}),
+    labourPayout: switch (json.mapOrNull('labour_payout')) {
+      final m? => LabourPayout.fromJson(m),
+      _ => null,
+    },
   );
 
   /// The step the booking is sitting on — what to say at the top of the screen.

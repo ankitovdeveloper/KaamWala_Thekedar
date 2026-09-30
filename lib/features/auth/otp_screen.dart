@@ -196,6 +196,7 @@ class _OtpScreenState extends State<OtpScreen> {
         countryCode: widget.args.countryCode,
         draft: widget.args.draft,
         termsVersion: widget.args.termsVersion,
+        fcmToken: session.pendingFcmToken,
       );
       await session.signIn(result);
       if (!mounted) return;
