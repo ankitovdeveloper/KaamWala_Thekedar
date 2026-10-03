@@ -10,7 +10,7 @@
          shows the permission prompt at runtime; NotificationService requests it. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="KaamWala Thekedar"
+        android:label="KaamJi Thekedar"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

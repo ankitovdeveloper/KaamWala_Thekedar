@@ -87,6 +87,41 @@ abstract final class DeviceLocationService {
     );
   }
 
+  /// Where the phone is right now, for stamping onto something being sent — no
+  /// address lookup, no permission prompt, and a short leash.
+  ///
+  /// Null whenever it can't be had quickly (location off, permission not already
+  /// granted, no fix inside [timeout] and no last-known one). The caller has a
+  /// fallback — the profile's saved point — so this never blocks or interrupts
+  /// what the user is doing.
+  static Future<GeoPoint?> quickPoint({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
+        return null;
+      }
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: timeout,
+          ),
+        );
+      } on Object {
+        position = await Geolocator.getLastKnownPosition();
+      }
+      if (position == null) return null;
+      return GeoPoint(position.latitude, position.longitude);
+    } on Object {
+      return null;
+    }
+  }
+
   /// Opens the OS screen that can undo [reason], for the snackbar action.
   /// Returns false when there is no such screen for that reason.
   static Future<bool> openSettingsFor(LocationFailure reason) =>

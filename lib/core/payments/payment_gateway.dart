@@ -93,7 +93,7 @@ class RazorpayGateway implements PaymentGateway {
         'order_id': order.orderId,
         'amount': order.amount * 100, // paise
         'currency': order.currency,
-        'name': 'KaamWala',
+        'name': 'KaamJi',
         'description': description,
         'prefill': {
           'name': ?order.prefillName,

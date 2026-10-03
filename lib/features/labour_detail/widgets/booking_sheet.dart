@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/animations/entrance.dart';
 import '../../../core/animations/pressable.dart';
+import '../../../core/location/device_location.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
@@ -81,6 +82,12 @@ class _BookingSheetState extends State<BookingSheet> {
 
     final user = context.session.user;
 
+    // Where the Thekedar is *now*: the worker is shown how far away this is
+    // when the request rings, and the profile's saved point can be hours old.
+    // That saved point is the fallback when no quick fix is available.
+    final here = await DeviceLocationService.quickPoint();
+    if (!mounted) return;
+
     try {
       final booking = await context.repo.createBooking(
         labourId: widget.labour.id,
@@ -92,8 +99,8 @@ class _BookingSheetState extends State<BookingSheet> {
         offeredAmount: _price,
         address: _address.text.trim(),
         city: user?.city,
-        latitude: user?.latitude,
-        longitude: user?.longitude,
+        latitude: here?.lat ?? user?.latitude,
+        longitude: here?.lng ?? user?.longitude,
         notes: _notes.text.trim(),
       );
       if (!mounted) return;

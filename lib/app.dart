@@ -82,7 +82,7 @@ class _KaamWalaAppState extends State<KaamWalaApp> {
     return SessionScope(
       session: _session,
       child: MaterialApp(
-        title: 'KaamWala',
+        title: 'KaamJi Thekedar',
         debugShowCheckedModeBanner: false,
         navigatorKey: Routes.navigatorKey,
         theme: AppTheme.light,

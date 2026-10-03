@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Plate behind the adaptive launcher icon: the app's brand yellow. -->
-    <color name="ic_launcher_background">#FFD600</color>
+    <!-- Plate behind the adaptive launcher icon: the KaamJi logo's own light-blue plate. -->
+    <color name="ic_launcher_background">#D6F0FF</color>
 </resources>

@@ -32,7 +32,7 @@ class AppStrings {
   // ── Brand ─────────────────────────────────────────────────────────────────
 
   /// The product name is not translated; it is the brand.
-  String get appName => 'KaamWala';
+  String get appName => 'KaamJi';
   String get tagline => 'Book labour instantly';
 
   // ── Generic actions & errors ──────────────────────────────────────────────
@@ -531,7 +531,7 @@ class AppStrings {
   String get payBeneficiary => 'Account par naam';
   String payOnlineButton(int amount) => '₹$amount Pay karein';
   String payOnlineNote(String name) =>
-      'Razorpay se surakshit payment — paisa KaamWala ke through $name tak pahunchega.';
+      'Razorpay se surakshit payment — paisa KaamJi ke through $name tak pahunchega.';
   String get payCancelled => 'Payment cancel ho gaya. Koi paisa nahi kata.';
   String get payFailed => 'Payment nahi ho paya. Dobara try karein.';
   String get payVerifyPending =>
@@ -1429,7 +1429,7 @@ class _Hindi extends AppStrings {
   String payOnlineButton(int amount) => '₹$amount पे करें';
   @override
   String payOnlineNote(String name) =>
-      'Razorpay से सुरक्षित पेमेंट — पैसा KaamWala के ज़रिए $name तक पहुँचेगा।';
+      'Razorpay से सुरक्षित पेमेंट — पैसा KaamJi के ज़रिए $name तक पहुँचेगा।';
   @override
   String get payCancelled => 'पेमेंट कैंसल हो गया। कोई पैसा नहीं कटा।';
   @override
@@ -2401,7 +2401,7 @@ class _English extends AppStrings {
   String payOnlineButton(int amount) => 'Pay ₹$amount';
   @override
   String payOnlineNote(String name) =>
-      'Secure payment via Razorpay — KaamWala passes the money on to $name.';
+      'Secure payment via Razorpay — KaamJi passes the money on to $name.';
   @override
   String get payCancelled => 'Payment cancelled. Nothing was charged.';
   @override
@@ -3184,7 +3184,7 @@ class _Bhojpuri extends _Hindi {
   String payOnlineButton(int amount) => '₹$amount पे करीं';
   @override
   String payOnlineNote(String name) =>
-      'Razorpay से सुरक्षित पेमेंट — पइसा KaamWala के जरिए $name तक पहुँची।';
+      'Razorpay से सुरक्षित पेमेंट — पइसा KaamJi के जरिए $name तक पहुँची।';
   @override
   String get payCancelled => 'पेमेंट कैंसल हो गइल। कवनो पइसा ना कटल।';
   @override

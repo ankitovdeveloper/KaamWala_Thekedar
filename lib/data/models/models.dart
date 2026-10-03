@@ -2014,7 +2014,7 @@ class LegalDocument {
 /// `database/migrations/…_create_legal_documents_table.php`.
 const _bundledTerms = '''
 1. Account aur pehchaan
-KaamWala par account banane ke liye aapka mobile number OTP se verify kiya jaata hai. Aap jo jaankari dete hain (naam, city, skills, documents) woh sahi honi chahiye. Galat jaankari par account band kiya ja sakta hai.
+KaamJi par account banane ke liye aapka mobile number OTP se verify kiya jaata hai. Aap jo jaankari dete hain (naam, city, skills, documents) woh sahi honi chahiye. Galat jaankari par account band kiya ja sakta hai.
 
 2. Kaam aur booking
 App sirf Thekedar aur Labour ko aapas mein jodne ka zariya hai. Kaam ki quality, samay aur vyavhaar ki zimmedari dono paksh ki apni hai. Booking accept karne ke baad tay kiya gaya samay aur rate maanya hoga.
