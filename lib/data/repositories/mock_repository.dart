@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../api/api_exception.dart';
 import '../mock_data.dart';
 import '../models/models.dart';
+import '../models/reward_models.dart';
 import 'kaamwala_repository.dart';
 
 /// Serves the seeded design data with a small artificial latency, so the app
@@ -769,6 +770,200 @@ class MockRepository implements KaamWalaRepository {
 
   @override
   Future<List<SavedAddress>> addresses() => _delayed(Mock.addresses);
+
+  // ── Rewards ───────────────────────────────────────────────────────────────
+
+  /// The seeded Thekedar campaigns, as the server would send them, so the same
+  /// parser runs in a demo as against the real API. The Successful Match tool
+  /// kit starts out claimable, which makes the whole claim flow reachable with
+  /// nothing running; claiming it moves it on to "processing".
+  bool _toolKitClaimed = false;
+
+  static const _mockToolKitRewardId = 701;
+
+  Map<String, dynamic> _level(
+    int id,
+    int target,
+    int current, {
+    String type = 'milestone',
+    String? name,
+    String? status,
+    int? rewardId,
+  }) => {
+    'id': id,
+    'target': target,
+    'reward_type': type,
+    'reward_name': name,
+    'reward_description': null,
+    'reward_value': 0,
+    'image_url': null,
+    'completed': current >= target,
+    'status': status ?? (current >= target ? 'completed' : 'locked'),
+    'user_reward_id': rewardId,
+    'can_claim': status == 'unlocked' && type == 'physical',
+  };
+
+  Map<String, dynamic> _campaign({
+    required int id,
+    required String type,
+    required String title,
+    required String subtitle,
+    required String button,
+    required int current,
+    required List<Map<String, dynamic>> levels,
+    required List<Map<String, String>> steps,
+    required List<String> tips,
+    Map<String, String>? referral,
+  }) {
+    final next = levels.where((l) => (l['target'] as int) > current);
+    return {
+      'id': id,
+      'name': title,
+      'slug': 'mock-$id',
+      'type': type,
+      'title': title,
+      'subtitle': subtitle,
+      'description': null,
+      'banner_image_url': null,
+      'icon_url': null,
+      'button_text': button,
+      'current': current,
+      'target': levels.last['target'],
+      'next_target': next.isEmpty ? null : next.first['target'],
+      'progress_percentage': (current * 100 / (levels.last['target'] as int))
+          .floor()
+          .clamp(0, 100),
+      'levels': levels,
+      'steps': steps,
+      'tips': tips,
+      'referral': ?referral,
+    };
+  }
+
+  @override
+  Future<RewardsData> rewards() {
+    const shareCurrent = 7;
+    const matchCurrent = 50;
+    final kit = _toolKitClaimed ? 'claimed' : 'unlocked';
+
+    return _delayed(
+      RewardsData.fromJson({
+        'wallet_balance': 0,
+        'campaigns': [
+          _campaign(
+            id: 2,
+            type: 'sharing',
+            title: 'Share & Earn Rewards',
+            subtitle: 'Invite your friends and earn amazing gifts',
+            button: 'Share App Now',
+            current: shareCurrent,
+            levels: [
+              _level(6, 1, shareCurrent),
+              _level(7, 5, shareCurrent),
+              _level(8, 10, shareCurrent),
+              _level(9, 20, shareCurrent),
+              _level(
+                10,
+                50,
+                shareCurrent,
+                type: 'physical',
+                name: 'Free Toolbox',
+              ),
+            ],
+            steps: const [
+              {
+                'title': 'Share App',
+                'description': 'Share the app with your friends',
+                'icon': 'share',
+              },
+              {
+                'title': 'Friends Join',
+                'description': 'Your friends download and use the app',
+                'icon': 'users',
+              },
+              {
+                'title': 'Earn Rewards',
+                'description': 'Complete targets and get exciting gifts',
+                'icon': 'gift',
+              },
+            ],
+            tips: const ['Share on WhatsApp, Facebook, Instagram'],
+            referral: const {
+              'code': 'KWAMIT25',
+              'link': 'https://kaamji.app/?ref=KWAMIT25',
+            },
+          ),
+          _campaign(
+            id: 4,
+            type: 'match',
+            title: 'Successful Match Rewards',
+            subtitle: 'Kaam karwao, reward pao',
+            button: 'Labour Dhundho',
+            current: matchCurrent,
+            levels: [
+              _level(16, 1, matchCurrent),
+              _level(17, 5, matchCurrent),
+              _level(18, 10, matchCurrent),
+              _level(19, 20, matchCurrent),
+              _level(
+                20,
+                50,
+                matchCurrent,
+                type: 'physical',
+                name: 'Tool Kit',
+                status: kit,
+                rewardId: _mockToolKitRewardId,
+              ),
+            ],
+            steps: const [
+              {
+                'title': 'Create Matches',
+                'description': 'Help labourers and contractors connect',
+                'icon': 'handshake',
+              },
+              {
+                'title': 'Complete Jobs',
+                'description': 'Finish successful labour-contractor matches',
+                'icon': 'check',
+              },
+              {
+                'title': 'Earn Rewards',
+                'description': 'Get amazing rewards and benefits',
+                'icon': 'gift',
+              },
+            ],
+            tips: const [
+              'Only completed, paid and confirmed jobs count as successful matches.',
+            ],
+          ),
+        ],
+      }),
+    );
+  }
+
+  @override
+  Future<Map<int, UserReward>> earnedRewards() => _delayed({
+    if (_toolKitClaimed)
+      _mockToolKitRewardId: const UserReward(
+        id: _mockToolKitRewardId,
+        status: 'claimed',
+        trackingNumber: '',
+        adminNote: '',
+      ),
+  });
+
+  @override
+  Future<void> claimReward(int userRewardId, ClaimDetails details) async {
+    await _delayed(null);
+    if (_toolKitClaimed || userRewardId != _mockToolKitRewardId) {
+      // The server's answer for a reward that is already on its way.
+      throw const ApiException(
+        'Ye reward pehle se claim ho chuka hai.',
+        statusCode: 422,
+      );
+    }
+    _toolKitClaimed = true;
+  }
 }
 
 /// One worker travelling to one job, played out against the wall clock.

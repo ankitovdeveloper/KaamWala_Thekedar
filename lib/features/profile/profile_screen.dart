@@ -14,6 +14,7 @@ import '../../widgets/kw_button.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
 import '../location/location_picker_screen.dart';
+import '../rewards/rewards_screen.dart';
 import '../shell/home_shell.dart';
 import 'edit_profile_screen.dart';
 import 'widgets/profile_photo_picker.dart';
@@ -184,8 +185,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         subtitle: s.reviewsGivenCount(
                           bundle.stats.reviewsGiven,
                         ),
-                        divider: false,
                         onTap: () => _toast(s.reviewsPageSoon),
+                      ),
+                      KwMenuRow(
+                        icon: Icons.card_giftcard_rounded,
+                        label: s.rewardsTitle,
+                        subtitle: s.rewardsMenuSub,
+                        divider: false,
+                        trailing: KwBadge(label: s.badgeNew),
+                        onTap: () => RewardsScreen.push(context),
                       ),
                     ],
                   ),
@@ -257,12 +265,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Gap.hLg,
                 KwIconButton(
                   icon: Icons.ios_share_rounded,
-                  tooltip: s.shareProfile,
-                  onPressed: () => _toast(
-                    user.referralCode == null
-                        ? s.referralCodeSoon
-                        : s.referralCodeIs(user.referralCode!),
-                  ),
+                  tooltip: s.referEarn,
+                  onPressed: () => RewardsScreen.push(context),
                 ),
               ],
             ),

@@ -24,6 +24,8 @@ class KwTextField extends StatefulWidget {
     this.textInputAction,
     this.textCapitalization = TextCapitalization.none,
     this.enabled = true,
+    this.minLines,
+    this.maxLines = 1,
   });
 
   final TextEditingController? controller;
@@ -43,6 +45,11 @@ class KwTextField extends StatefulWidget {
   final TextCapitalization textCapitalization;
 
   final bool enabled;
+
+  /// A single line unless told otherwise; set both for a short multi-line box
+  /// such as a delivery address.
+  final int? minLines;
+  final int? maxLines;
 
   @override
   State<KwTextField> createState() => _KwTextFieldState();
@@ -109,6 +116,8 @@ class _KwTextFieldState extends State<KwTextField> {
                   onSubmitted: widget.onSubmitted,
                   textInputAction: widget.textInputAction,
                   textCapitalization: widget.textCapitalization,
+                  minLines: widget.minLines,
+                  maxLines: widget.maxLines,
                   style: AppType.bodyStrong.copyWith(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,

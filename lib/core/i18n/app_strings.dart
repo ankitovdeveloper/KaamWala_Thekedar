@@ -575,9 +575,6 @@ class AppStrings {
 
   // ── Profile ───────────────────────────────────────────────────────────────
 
-  String get shareProfile => 'Profile share karein';
-  String get referralCodeSoon => 'Referral code jald aayega';
-  String referralCodeIs(String code) => 'Referral code: $code';
   String get editProfile => 'Profile Edit karein';
   String get statTotalBookings => 'Total Bookings';
   String get statTotalSpend => 'Total Spend';
@@ -691,6 +688,78 @@ class AppStrings {
   String get logout => 'Logout';
   String get logoutTitle => 'Logout karein?';
   String get logoutMessage => 'Aapko dobara OTP se login karna padega.';
+
+  // ── Rewards (Share & Earn / Successful Match) ─────────────────────────────
+
+  String get rewardsTitle => 'Rewards';
+  String get rewardsMenuSub => 'Share karo, gift pao';
+  String get rewardsLoadFail => 'Rewards load nahi hue';
+  String get rewardsEmpty => 'Abhi koi reward nahi chal raha';
+  String get rewardsEmptyHint => 'Naye reward yahan dikhenge.';
+
+  /// The hero title is three pieces so the middle word can be picked out in
+  /// yellow: "Share karo aur" + "Kamao" / "Rewards 🎁".
+  String get rewardsHeroTop => 'Share karo aur';
+  String get rewardsHeroAccent => 'Kamao';
+  String get rewardsHeroBottom => 'Rewards';
+  String get rewardsHeroSub =>
+      'Hamari community badhao aur shandaar rewards pao!';
+  String get rewardsTagline =>
+      'Sahi mazdoor, sahi thekedar, milkar banaye behtar kal!';
+  String rewardsCampaignN(int n) => 'Campaign $n';
+  String get rewardsRibbonSharing => 'Zyada Shares, Zyada Rewards!';
+  String get rewardsRibbonMatch => 'Asli Match, Asli Fayde!';
+  String rewardsGet(String reward) => '$reward pao';
+
+  /// Plural unit under a level, and the singular for a level whose target is
+  /// exactly 1 ("1 Share").
+  String get rewardsUnitSharing => 'Shares';
+  String get rewardsUnitMatch => 'Matches';
+  String get rewardsUnitSharingOne => 'Share';
+  String get rewardsUnitMatchOne => 'Match';
+  String rewardsAtLevel(int n, String unit) => '$n $unit par';
+  String rewardsToNext(int n) => 'Agle reward ke liye $n aur';
+  String get rewardsAllDone => 'Aapne saare level poore kar liye 🎉';
+  String rewardsWalletCredit(int value) => '₹$value wallet credit';
+  String rewardsWalletAdded(int value) => '₹$value aapke wallet me jud gaye';
+  String get rewardsStatusLocked => 'Locked';
+  String get rewardsStatusReached => 'Poora hua';
+  String get rewardsStatusProcessing => 'Processing';
+  String get rewardsStatusDelivered => 'Mil gaya';
+  String get rewardsStatusRejected => 'Rejected';
+  String rewardsTracking(String tracking) => 'Tracking: $tracking';
+  String rewardsReason(String reason) => 'Wajah: $reason';
+  String get rewardsClaim => 'Reward Claim Karein';
+  String get rewardsHow => 'Ye kaise kaam karta hai?';
+  String get rewardsTips => 'Tips';
+  String get rewardsYourCode => 'Aapka referral code';
+  String get rewardsCopyLink => 'Link Copy';
+  String get rewardsLinkCopied => 'Link copy ho gaya';
+  String get rewardsCodeCopied => 'Code copy ho gaya';
+  String get rewardsShareBtn => 'App Abhi Share Karein';
+
+  /// Fallback for the Successful Match button when the campaign has no
+  /// `button_text` of its own.
+  String get rewardsFindLabourBtn => 'Labour Dhundho';
+  String rewardsShareText(String code, String link) =>
+      '$appName se judo aur apne paas kaam ya mazdoor pao! '
+      'Mera code $code daalkar sign-up karo: $link';
+
+  // The delivery form for a physical reward. Name, phone, city and address
+  // reuse the labels the profile forms already have.
+
+  String get claimTitle => 'Delivery ki details';
+  String claimSubtitle(String reward) => '$reward kahan bhejein?';
+  String get claimAddressHint => 'Ghar no., gali, area';
+  String get claimState => 'State';
+  String get claimPincode => 'Pincode';
+  String get claimRequired => 'Zaroori hai';
+  String get claimBadPhone => '10 digit ka phone number daalein';
+  String get claimBadPincode => '6 digit ka pincode daalein';
+  String get claimSubmit => 'Claim bhejein';
+  String get claimSubmitting => 'Bhej rahe hain…';
+  String get claimDoneTitle => 'Claim bhej diya';
+  String get claimDoneMsg => 'Admin jaldi approve karega. Update yahin dikhega.';
 }
 
 // ── Hindi ───────────────────────────────────────────────────────────────────
@@ -1504,12 +1573,6 @@ class _Hindi extends AppStrings {
   String get storyTerminated => 'काम बीच में बंद हुआ';
 
   @override
-  String get shareProfile => 'प्रोफ़ाइल शेयर करें';
-  @override
-  String get referralCodeSoon => 'रेफ़रल कोड जल्द आएगा';
-  @override
-  String referralCodeIs(String code) => 'रेफ़रल कोड: $code';
-  @override
   String get editProfile => 'प्रोफ़ाइल एडिट करें';
   @override
   String get statTotalBookings => 'कुल बुकिंग';
@@ -1699,6 +1762,116 @@ class _Hindi extends AppStrings {
   String get logoutTitle => 'लॉगआउट करें?';
   @override
   String get logoutMessage => 'आपको दोबारा OTP से लॉगिन करना पड़ेगा।';
+
+  // ── Rewards ───────────────────────────────────────────────────────────────
+
+  @override
+  String get rewardsTitle => 'रिवॉर्ड्स';
+  @override
+  String get rewardsMenuSub => 'शेयर करें, गिफ्ट पाएँ';
+  @override
+  String get rewardsLoadFail => 'रिवॉर्ड्स लोड नहीं हो सके';
+  @override
+  String get rewardsEmpty => 'अभी कोई रिवॉर्ड नहीं चल रहा';
+  @override
+  String get rewardsEmptyHint => 'नए रिवॉर्ड यहाँ दिखेंगे।';
+  @override
+  String get rewardsHeroTop => 'शेयर करें और';
+  @override
+  String get rewardsHeroAccent => 'कमाएँ';
+  @override
+  String get rewardsHeroBottom => 'रिवॉर्ड्स';
+  @override
+  String get rewardsHeroSub => 'हमारी कम्युनिटी बढ़ाएँ और शानदार रिवॉर्ड पाएँ!';
+  @override
+  String get rewardsTagline => 'सही मजदूर, सही ठेकेदार मिलकर बनाए बेहतर कल!';
+  @override
+  String rewardsCampaignN(int n) => 'कैंपेन $n';
+  @override
+  String get rewardsRibbonSharing => 'ज़्यादा शेयर, ज़्यादा रिवॉर्ड!';
+  @override
+  String get rewardsRibbonMatch => 'असली मैच, असली फायदे!';
+  @override
+  String rewardsGet(String reward) => '$reward पाएँ';
+  @override
+  String get rewardsUnitSharing => 'शेयर';
+  @override
+  String get rewardsUnitMatch => 'मैच';
+  @override
+  String get rewardsUnitSharingOne => 'शेयर';
+  @override
+  String get rewardsUnitMatchOne => 'मैच';
+  @override
+  String rewardsAtLevel(int n, String unit) => '$n $unit पर';
+  @override
+  String rewardsToNext(int n) => 'अगले रिवॉर्ड के लिए $n और';
+  @override
+  String get rewardsAllDone => 'आपने सभी लेवल पूरे कर लिए 🎉';
+  @override
+  String rewardsWalletCredit(int value) => '₹$value वॉलेट क्रेडिट';
+  @override
+  String rewardsWalletAdded(int value) => '₹$value आपके वॉलेट में जुड़ गए';
+  @override
+  String get rewardsStatusLocked => 'लॉक्ड';
+  @override
+  String get rewardsStatusReached => 'पूरा हुआ';
+  @override
+  String get rewardsStatusProcessing => 'प्रोसेसिंग';
+  @override
+  String get rewardsStatusDelivered => 'मिल गया';
+  @override
+  String get rewardsStatusRejected => 'अस्वीकृत';
+  @override
+  String rewardsTracking(String tracking) => 'ट्रैकिंग: $tracking';
+  @override
+  String rewardsReason(String reason) => 'वजह: $reason';
+  @override
+  String get rewardsClaim => 'रिवॉर्ड क्लेम करें';
+  @override
+  String get rewardsHow => 'यह कैसे काम करता है?';
+  @override
+  String get rewardsTips => 'टिप्स';
+  @override
+  String get rewardsYourCode => 'आपका रेफ़रल कोड';
+  @override
+  String get rewardsCopyLink => 'लिंक कॉपी';
+  @override
+  String get rewardsLinkCopied => 'लिंक कॉपी हो गया';
+  @override
+  String get rewardsCodeCopied => 'कोड कॉपी हो गया';
+  @override
+  String get rewardsShareBtn => 'ऐप अभी शेयर करें';
+  @override
+  String get rewardsFindLabourBtn => 'कारीगर खोजें';
+  @override
+  String rewardsShareText(String code, String link) =>
+      '$appName से जुड़ें और अपने पास काम या मज़दूर पाएँ! '
+      'मेरा कोड $code डालकर साइन-अप करें: $link';
+
+  @override
+  String get claimTitle => 'डिलीवरी की जानकारी';
+  @override
+  String claimSubtitle(String reward) => '$reward कहाँ भेजें?';
+  @override
+  String get claimAddressHint => 'मकान नं., गली, इलाका';
+  @override
+  String get claimState => 'राज्य';
+  @override
+  String get claimPincode => 'पिनकोड';
+  @override
+  String get claimRequired => 'ज़रूरी है';
+  @override
+  String get claimBadPhone => '10 अंकों का फ़ोन नंबर डालें';
+  @override
+  String get claimBadPincode => '6 अंकों का पिनकोड डालें';
+  @override
+  String get claimSubmit => 'क्लेम भेजें';
+  @override
+  String get claimSubmitting => 'भेज रहे हैं…';
+  @override
+  String get claimDoneTitle => 'क्लेम भेज दिया';
+  @override
+  String get claimDoneMsg => 'एडमिन जल्द ही अप्रूव करेगा। अपडेट यहीं दिखेगा।';
 }
 
 // ── English ─────────────────────────────────────────────────────────────────
@@ -2476,12 +2649,6 @@ class _English extends AppStrings {
   String get storyTerminated => 'Work stopped part-way';
 
   @override
-  String get shareProfile => 'Share profile';
-  @override
-  String get referralCodeSoon => 'Referral codes are coming soon';
-  @override
-  String referralCodeIs(String code) => 'Referral code: $code';
-  @override
   String get editProfile => 'Edit profile';
   @override
   String get statTotalBookings => 'Total bookings';
@@ -2674,6 +2841,118 @@ class _English extends AppStrings {
   String get logoutTitle => 'Log out?';
   @override
   String get logoutMessage => 'You will need to log in again with an OTP.';
+
+  // ── Rewards ───────────────────────────────────────────────────────────────
+
+  @override
+  String get rewardsTitle => 'Rewards';
+  @override
+  String get rewardsMenuSub => 'Share & earn gifts';
+  @override
+  String get rewardsLoadFail => 'Could not load rewards';
+  @override
+  String get rewardsEmpty => 'No rewards running right now';
+  @override
+  String get rewardsEmptyHint => 'New reward campaigns will show up here.';
+  @override
+  String get rewardsHeroTop => 'Share &';
+  @override
+  String get rewardsHeroAccent => 'Earn';
+  @override
+  String get rewardsHeroBottom => 'Rewards';
+  @override
+  String get rewardsHeroSub => 'Grow our community and get amazing rewards!';
+  @override
+  String get rewardsTagline =>
+      'Right worker, right contractor — building a better tomorrow together!';
+  @override
+  String rewardsCampaignN(int n) => 'Campaign $n';
+  @override
+  String get rewardsRibbonSharing => 'More Shares More Rewards!';
+  @override
+  String get rewardsRibbonMatch => 'Real Matches Real Benefits!';
+  @override
+  String rewardsGet(String reward) => 'Get $reward';
+  @override
+  String get rewardsUnitSharing => 'Shares';
+  @override
+  String get rewardsUnitMatch => 'Matches';
+  @override
+  String get rewardsUnitSharingOne => 'Share';
+  @override
+  String get rewardsUnitMatchOne => 'Match';
+  @override
+  String rewardsAtLevel(int n, String unit) => 'At $n $unit';
+  @override
+  String rewardsToNext(int n) => '$n more for your next reward';
+  @override
+  String get rewardsAllDone => 'You have reached every level 🎉';
+  @override
+  String rewardsWalletCredit(int value) => '₹$value wallet credit';
+  @override
+  String rewardsWalletAdded(int value) => '₹$value added to your wallet';
+  @override
+  String get rewardsStatusLocked => 'Locked';
+  @override
+  String get rewardsStatusReached => 'Reached';
+  @override
+  String get rewardsStatusProcessing => 'Processing';
+  @override
+  String get rewardsStatusDelivered => 'Delivered';
+  @override
+  String get rewardsStatusRejected => 'Rejected';
+  @override
+  String rewardsTracking(String tracking) => 'Tracking: $tracking';
+  @override
+  String rewardsReason(String reason) => 'Reason: $reason';
+  @override
+  String get rewardsClaim => 'Claim Reward';
+  @override
+  String get rewardsHow => 'How It Works?';
+  @override
+  String get rewardsTips => 'Tips';
+  @override
+  String get rewardsYourCode => 'Your referral code';
+  @override
+  String get rewardsCopyLink => 'Copy Link';
+  @override
+  String get rewardsLinkCopied => 'Link copied';
+  @override
+  String get rewardsCodeCopied => 'Code copied';
+  @override
+  String get rewardsShareBtn => 'Share App Now';
+  @override
+  String get rewardsFindLabourBtn => 'Find Labour';
+  @override
+  String rewardsShareText(String code, String link) =>
+      'Join $appName and find work or workers near you! '
+      'Sign up with my code $code: $link';
+
+  @override
+  String get claimTitle => 'Delivery details';
+  @override
+  String claimSubtitle(String reward) => 'Where should we send $reward?';
+  @override
+  String get claimAddressHint => 'House no., street, area';
+  @override
+  String get claimState => 'State';
+  @override
+  String get claimPincode => 'Pincode';
+  @override
+  String get claimRequired => 'Required';
+  @override
+  String get claimBadPhone => 'Enter a 10-digit phone number';
+  @override
+  String get claimBadPincode => 'Enter a 6-digit pincode';
+  @override
+  String get claimSubmit => 'Submit claim';
+  @override
+  String get claimSubmitting => 'Sending…';
+  @override
+  String get claimDoneTitle => 'Claim sent';
+  @override
+  String get claimDoneMsg =>
+      'Admin will approve it soon. You will get an update here.';
 }
 
 // ── Bhojpuri ────────────────────────────────────────────────────────────────
@@ -3391,4 +3670,84 @@ class _Bhojpuri extends _Hindi {
   String get logoutTitle => 'लॉगआउट करीं?';
   @override
   String get logoutMessage => 'रउरा फेर से OTP से लॉगिन करे के पड़ी।';
+
+  // ── Rewards — only what differs from the Hindi above ──────────────────────
+
+  @override
+  String get rewardsTitle => 'रिवॉर्ड';
+  @override
+  String get rewardsMenuSub => 'शेयर करीं, गिफ्ट पाईं';
+  @override
+  String get rewardsLoadFail => 'रिवॉर्ड लोड ना भइल';
+  @override
+  String get rewardsEmpty => 'अभी कवनो रिवॉर्ड नइखे';
+  @override
+  String get rewardsEmptyHint => 'नया रिवॉर्ड इहाँ देखाई।';
+  @override
+  String get rewardsHeroTop => 'शेयर करीं आ';
+  @override
+  String get rewardsHeroAccent => 'कमाईं';
+  @override
+  String get rewardsHeroBottom => 'रिवॉर्ड';
+  @override
+  String get rewardsHeroSub => 'हमनी के कम्युनिटी बढ़ाईं आ शानदार रिवॉर्ड पाईं!';
+  @override
+  String get rewardsTagline => 'सही मजूर, सही ठेकेदार मिलके बनाईं बढ़िया काल्ह!';
+  @override
+  String get rewardsRibbonSharing => 'जादे शेयर, जादे रिवॉर्ड!';
+  @override
+  String get rewardsRibbonMatch => 'असली मैच, असली फायदा!';
+  @override
+  String rewardsGet(String reward) => '$reward पाईं';
+  @override
+  String rewardsToNext(int n) => 'अगिला रिवॉर्ड खातिर $n अउर';
+  @override
+  String get rewardsAllDone => 'रउरा सब लेवल पूरा कर लेनी 🎉';
+  @override
+  String rewardsWalletAdded(int value) => '₹$value रउरा वॉलेट में जुड़ गइल';
+  @override
+  String get rewardsStatusLocked => 'लॉक';
+  @override
+  String get rewardsStatusReached => 'पूरा भइल';
+  @override
+  String get rewardsStatusDelivered => 'मिल गइल';
+  @override
+  String get rewardsStatusRejected => 'अस्वीकार';
+  @override
+  String get rewardsClaim => 'रिवॉर्ड क्लेम करीं';
+  @override
+  String get rewardsHow => 'ई कइसे काम करेला?';
+  @override
+  String get rewardsYourCode => 'रउरा के रेफ़रल कोड';
+  @override
+  String get rewardsLinkCopied => 'लिंक कॉपी हो गइल';
+  @override
+  String get rewardsCodeCopied => 'कोड कॉपी हो गइल';
+  @override
+  String get rewardsShareBtn => 'ऐप अबहीं शेयर करीं';
+  @override
+  String get rewardsFindLabourBtn => 'कारीगर खोजीं';
+  @override
+  String rewardsShareText(String code, String link) =>
+      '$appName से जुड़ीं आ आपन लगे काम भा मजूर पाईं! '
+      'हमार कोड $code डालके साइन-अप करीं: $link';
+
+  @override
+  String get claimTitle => 'डिलीवरी के जानकारी';
+  @override
+  String claimSubtitle(String reward) => '$reward कहाँ भेजीं?';
+  @override
+  String get claimRequired => 'जरूरी बा';
+  @override
+  String get claimBadPhone => '10 अंक के फ़ोन नंबर डालीं';
+  @override
+  String get claimBadPincode => '6 अंक के पिनकोड डालीं';
+  @override
+  String get claimSubmit => 'क्लेम भेजीं';
+  @override
+  String get claimSubmitting => 'भेजत बानी…';
+  @override
+  String get claimDoneTitle => 'क्लेम भेज देहनी';
+  @override
+  String get claimDoneMsg => 'एडमिन जल्दी अप्रूव करी। अपडेट इहें देखाई।';
 }

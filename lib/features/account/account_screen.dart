@@ -15,6 +15,7 @@ import '../../widgets/kw_async.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
 import '../../widgets/kw_terms.dart';
+import '../rewards/rewards_screen.dart';
 
 /// Account settings, backed by `GET /v1/thekedar/account` and
 /// `PUT /v1/thekedar/account/preferences`.
@@ -233,7 +234,6 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Widget _content(AccountSettings settings) {
     final s = context.s;
-    final referral = context.session.user?.referralCode;
 
     return CustomScrollView(
       physics: const BouncingScrollPhysics(
@@ -317,11 +317,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         label: s.referEarn,
                         divider: false,
                         trailing: KwBadge(label: s.badgeNew),
-                        onTap: () => _toast(
-                          referral == null
-                              ? s.referralCodeSoon
-                              : s.referralCodeIs(referral),
-                        ),
+                        onTap: () => RewardsScreen.push(context),
                       ),
                     ],
                   ),

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../models/models.dart';
+import '../models/reward_models.dart';
 
 /// Everything the Thekedar app asks of a backend.
 ///
@@ -239,4 +240,24 @@ abstract interface class KaamWalaRepository {
 
   /// `GET /thekedar/addresses`
   Future<List<SavedAddress>> addresses();
+
+  // ── Rewards ───────────────────────────────────────────────────────────────
+
+  /// `GET /rewards` — every campaign running for a Thekedar (Share & Earn,
+  /// Successful Match) with progress, levels, steps and tips, plus the reward
+  /// wallet. The path is shared with the Labour app; the server picks the
+  /// campaigns from the user's role.
+  Future<RewardsData> rewards();
+
+  /// `GET /rewards/history` → the rewards this user has earned, keyed by id.
+  ///
+  /// Only garnish for the screen — the reject reason and the courier tracking
+  /// number live here, not in [rewards] — so callers treat a failure as "no
+  /// extra detail", never as an error.
+  Future<Map<int, UserReward>> earnedRewards();
+
+  /// `POST /rewards/{id}/claim` — delivery details for a physical reward.
+  /// Throws [ApiException]: 422 when it was already claimed or a field is
+  /// refused, 403 when the reward is not this user's.
+  Future<void> claimReward(int userRewardId, ClaimDetails details);
 }

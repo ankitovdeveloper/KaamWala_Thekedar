@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../api/api_client.dart';
 import '../api/api_config.dart';
 import '../models/models.dart';
+import '../models/reward_models.dart';
 import 'kaamwala_repository.dart';
 
 /// Talks to the Laravel API. Every path here matches a line in
@@ -518,6 +519,29 @@ class ApiRepository implements KaamWalaRepository {
   Future<List<SavedAddress>> addresses() async => rowsOf(
     await _api.get('thekedar/addresses'),
   ).map(SavedAddress.fromJson).toList();
+
+  // ── Rewards ───────────────────────────────────────────────────────────────
+
+  // `/rewards` is the one shared prefix (not `/thekedar/...`): the controller
+  // is the same for both apps and filters campaigns by the caller's role.
+
+  @override
+  Future<RewardsData> rewards() async =>
+      RewardsData.fromJson(_obj(await _api.get('rewards')));
+
+  @override
+  Future<Map<int, UserReward>> earnedRewards() async {
+    final data = _obj(await _api.get('rewards/history'));
+    return {
+      for (final row in data.listOfMaps('rewards'))
+        row.intVal('id'): UserReward.fromJson(row),
+    };
+  }
+
+  @override
+  Future<void> claimReward(int userRewardId, ClaimDetails details) async {
+    await _api.post('rewards/$userRewardId/claim', body: details.toJson());
+  }
 
   static String _ymd(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-'
