@@ -15,7 +15,8 @@
 abstract final class ApiConfig {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
+    defaultValue: 'https://kaamji.work/api/v1',
+    // defaultValue: 'https://apps.ovsofts.com/RR/public/api/v1',
     // defaultValue: 'http://localhost/roziroti/public/api/v1',
   );
 

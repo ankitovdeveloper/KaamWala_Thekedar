@@ -112,11 +112,17 @@ class NotificationService {
 
   void _showForeground(RemoteMessage message) {
     final notification = message.notification;
-    if (notification == null) return;
+    final title = notification?.title ?? message.data['title']?.toString();
+    final body = notification?.body ??
+        message.data['body']?.toString() ??
+        message.data['message']?.toString();
+
+    if (title == null && body == null) return;
+
     _local.show(
       message.hashCode,
-      notification.title,
-      notification.body,
+      title,
+      body,
       NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannel.id,

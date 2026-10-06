@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "295655722634",
+    "project_id": "kaamwala-365f1",
+    "storage_bucket": "kaamwala-365f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:295655722634:android:937938a9d1395065bba773",
+        "android_client_info": {
+          "package_name": "com.ovsofts.labour"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQ7SvE6yygOnDSpnpXsjNKyY1AqSOxD2E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:295655722634:android:96327edf92ccd72dbba773",
+        "android_client_info": {
+          "package_name": "com.ovsofts.thekedar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQ7SvE6yygOnDSpnpXsjNKyY1AqSOxD2E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

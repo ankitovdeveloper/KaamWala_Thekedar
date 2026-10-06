@@ -192,6 +192,9 @@ class Session extends ChangeNotifier {
           // a 401 still bounces to login through onUnauthorized.
           _restored = true;
           notifyListeners();
+          if (_pendingFcmToken != null) {
+            unawaited(_sendFcmToken(_pendingFcmToken!));
+          }
           unawaited(_refreshUser());
           return;
         }
@@ -201,6 +204,9 @@ class Session extends ChangeNotifier {
         try {
           _user = await _repository.me();
           await _persistUser(_user!);
+          if (_pendingFcmToken != null) {
+            unawaited(_sendFcmToken(_pendingFcmToken!));
+          }
         } on Object {
           // Offline with nothing cached: start at login rather than in a shell
           // with no user.
@@ -234,6 +240,10 @@ class Session extends ChangeNotifier {
     _localLanguage = result.user.language;
     _client?.setToken(result.token);
     notifyListeners();
+
+    if (_pendingFcmToken != null) {
+      unawaited(_sendFcmToken(_pendingFcmToken!));
+    }
 
     // Persistence is a convenience, not part of being signed in — a storage
     // failure (or a mock session with no platform plugins) must not block the

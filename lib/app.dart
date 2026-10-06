@@ -21,6 +21,7 @@ class _KaamWalaAppState extends State<KaamWalaApp> {
   late final Session _session = widget.session ?? Session();
 
   bool _wasAuthenticated = false;
+  int? _pendingBookingId;
 
   @override
   void initState() {
@@ -55,6 +56,19 @@ class _KaamWalaAppState extends State<KaamWalaApp> {
       );
     }
     _wasAuthenticated = isAuthed;
+
+    if (_pendingBookingId != null && _session.isRestored) {
+      final bookingId = _pendingBookingId;
+      _pendingBookingId = null;
+      if (isAuthed && bookingId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Routes.navigatorKey.currentState?.pushNamed(
+            Routes.bookingDetail,
+            arguments: bookingId,
+          );
+        });
+      }
+    }
   }
 
   /// A tapped notification always carries `type: booking` today (see the
@@ -64,6 +78,14 @@ class _KaamWalaAppState extends State<KaamWalaApp> {
   void _handleNotificationTap(Map<String, String> data) {
     final bookingId = int.tryParse(data['booking_id'] ?? '');
     if (bookingId == null) return;
+
+    if (!_session.isRestored) {
+      _pendingBookingId = bookingId;
+      return;
+    }
+
+    if (!_session.isAuthenticated) return;
+
     Routes.navigatorKey.currentState?.pushNamed(
       Routes.bookingDetail,
       arguments: bookingId,
@@ -82,7 +104,7 @@ class _KaamWalaAppState extends State<KaamWalaApp> {
     return SessionScope(
       session: _session,
       child: MaterialApp(
-        title: 'KaamJi Thekedar',
+        title: 'KaamJi Contractor',
         debugShowCheckedModeBanner: false,
         navigatorKey: Routes.navigatorKey,
         theme: AppTheme.light,
