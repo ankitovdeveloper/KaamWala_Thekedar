@@ -130,9 +130,10 @@ class _LoginScreenState extends State<LoginScreen> {
       headerColor: AppColors.yellow,
       body: SafeArea(
         top: false,
-        // The form scrolls; the legal line is a separate bottom slot so it
-        // stays pinned without needing IntrinsicHeight + Spacer (which can't
-        // survive a landscape viewport shorter than the content).
+        // The form scrolls; the Terms tick, the button and the register link are
+        // a separate footer so they stay pinned without needing IntrinsicHeight
+        // + Spacer (which can't survive a landscape viewport shorter than the
+        // content).
         child: Column(
           children: [
             Expanded(
@@ -171,21 +172,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         delay: const Duration(milliseconds: 340),
                         child: Shake(trigger: _shake, child: _phoneRow()),
                       ),
-                      Gap.v16,
-                      FadeSlideIn(
-                        delay: const Duration(milliseconds: 400),
-                        child: KwButton(
-                          label: s.sendOtp,
-                          icon: Icons.send_rounded,
-                          busy: _busy,
-                          onPressed: _sendOtp,
-                        ),
-                      ),
-                      Gap.vXxl,
-                      FadeSlideIn(
-                        delay: const Duration(milliseconds: 450),
-                        child: _registerLine(),
-                      ),
                     ],
                   ),
                 ),
@@ -196,18 +182,41 @@ class _LoginScreenState extends State<LoginScreen> {
                 context.pagePadding + 8,
                 Gap.md,
                 context.pagePadding + 8,
-                Gap.x3l,
+                Gap.x4l,
               ),
-              child: FadeSlideIn(
-                delay: const Duration(milliseconds: 640),
-                child: KwTermsCheck(
-                  value: _agreed,
-                  errorText: _termsError,
-                  onChanged: (v) => setState(() {
-                    _agreed = v;
-                    if (v) _termsError = null;
-                  }),
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Between the phone field above and the button below: the
+                  // number is typed, the terms are agreed to, then it is sent.
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 400),
+                    child: KwTermsCheck(
+                      value: _agreed,
+                      errorText: _termsError,
+                      onChanged: (v) => setState(() {
+                        _agreed = v;
+                        if (v) _termsError = null;
+                      }),
+                    ),
+                  ),
+                  Gap.vMd,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 460),
+                    child: KwButton(
+                      label: s.sendOtp,
+                      icon: Icons.send_rounded,
+                      busy: _busy,
+                      onPressed: _sendOtp,
+                    ),
+                  ),
+                  Gap.vXl,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 520),
+                    child: _registerLine(),
+                  ),
+                ],
               ),
             ),
           ],
@@ -357,4 +366,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-

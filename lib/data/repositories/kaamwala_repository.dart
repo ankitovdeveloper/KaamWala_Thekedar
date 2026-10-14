@@ -71,6 +71,17 @@ abstract interface class KaamWalaRepository {
   /// `GET /thekedar/all-labours-for-search`
   Future<List<Labour>> allLaboursForSearch();
 
+  /// `GET /thekedar/labour/groups` — "I need [count] of this skill": the live
+  /// workers around ([lat], [lng]) bunched into groups of [count] who live near
+  /// each other, nearest group first. The last group may be short.
+  Future<List<LabourGroup>> labourGroups({
+    required double lat,
+    required double lng,
+    required int skillId,
+    required int count,
+    int? radiusKm,
+  });
+
   /// `GET /legal/{slug}?app=thekedar` — the Terms & Conditions or Privacy
   /// Policy the login and register screens link to.
   ///
@@ -114,6 +125,34 @@ abstract interface class KaamWalaRepository {
     double? longitude,
     String? notes,
   });
+
+  /// `POST /thekedar/crews` — asks [size] workers of [skillId] at once.
+  ///
+  /// [labourIds] is the group picked from [labourGroups]; any of them who has
+  /// gone off duty since is skipped and replaced by the next nearest. The
+  /// server keeps the crew filled from then on. Throws [ApiException] (422)
+  /// when nobody is in reach at all.
+  Future<Crew> createCrew({
+    required int skillId,
+    required int size,
+    List<int> labourIds,
+    required DateTime workDate,
+    String? startTime,
+    required DayType dayType,
+    required String address,
+    String? city,
+    required double latitude,
+    required double longitude,
+    String? notes,
+    int? radiusKm,
+  });
+
+  /// `GET /thekedar/crews/{id}` — polled by the status screen. Reading it also
+  /// moves the crew along server-side (a request nobody answered is passed on).
+  Future<Crew> crew(int crewId);
+
+  /// `POST /thekedar/crews/{id}/cancel`
+  Future<Crew> cancelCrew(int crewId);
 
   /// `POST /thekedar/bookings/{id}/cancel`
   Future<Booking> cancelBooking(int bookingId);

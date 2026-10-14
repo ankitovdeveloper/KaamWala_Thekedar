@@ -506,6 +506,215 @@ class Labour {
   );
 }
 
+/// One bunch of same-skill workers who live near each other —
+/// `GET /thekedar/labour/groups`. The search lists these one after another with
+/// a divider between them, nearest area first, so a Thekedar who needs four
+/// painters can take a whole neighbourhood's worth in one go.
+@immutable
+class LabourGroup {
+  const LabourGroup({
+    required this.index,
+    required this.needed,
+    required this.workers,
+    this.distanceKm = 0,
+    this.spreadKm = 0,
+    this.area,
+    this.centre,
+  });
+
+  /// 1-based position in the list ("Area 1").
+  final int index;
+
+  /// How many workers the Thekedar asked for. The last group can hold fewer.
+  final int needed;
+  final List<Labour> workers;
+
+  /// How far the nearest worker in the group is from the search origin.
+  final double distanceKm;
+
+  /// How far apart the two farthest members live — what "same area" means.
+  final double spreadKm;
+
+  /// The city most of them live in, when they have said one.
+  final String? area;
+  final GeoPoint? centre;
+
+  factory LabourGroup.fromJson(Map<String, dynamic> json) => LabourGroup(
+    index: json.intVal('index', 1),
+    needed: json.intVal('needed', 1),
+    workers: json.listOfMaps('workers').map(Labour.fromJson).toList(),
+    distanceKm: json.dbl('distance_km'),
+    spreadKm: json.dbl('spread_km'),
+    area: json.strOrNull('area'),
+    centre: GeoPoint.fromJson(json),
+  );
+
+  int get size => workers.length;
+
+  /// False for the short group left over when the area runs out of workers.
+  bool get complete => size >= needed;
+
+  List<int> get workerIds => [for (final w in workers) w.id];
+
+  /// What the group costs for one full day, at each worker's own daily rate.
+  /// An estimate only: the server prices each worker from their rate for this
+  /// skill, and a replacement can cost a little more or less.
+  int get dailyTotal => workers.fold(0, (sum, w) => sum + w.dailyRate);
+}
+
+/// How far a crew booking has got — `Crew::payload()` on the server.
+enum CrewStatus {
+  /// Still asking: some places are unfilled, or requests are waiting on a reply.
+  searching,
+
+  /// Every place has an accepted worker.
+  filled,
+  cancelled;
+
+  static CrewStatus parse(String? v) => CrewStatus.values.firstWhere(
+    (e) => e.name == v,
+    orElse: () => CrewStatus.searching,
+  );
+}
+
+/// One worker in a crew, as the status screen lists them.
+@immutable
+class CrewMember {
+  const CrewMember({
+    required this.bookingId,
+    required this.labour,
+    required this.status,
+    this.jobStage = JobStage.pending,
+    this.amount = 0,
+    this.distanceKm,
+    this.rating = 0,
+    this.ratingsCount = 0,
+    this.city,
+  });
+
+  /// Each member is an ordinary booking — this is the one to open for the
+  /// arrival code, tracking and payment.
+  final int bookingId;
+  final LabourRef labour;
+  final BookingStatus status;
+  final JobStage jobStage;
+  final int amount;
+
+  /// From the job site, in km.
+  final double? distanceKm;
+  final double rating;
+  final int ratingsCount;
+  final String? city;
+
+  factory CrewMember.fromJson(Map<String, dynamic> json) {
+    final labour = json.mapOrNull('labour') ?? const <String, dynamic>{};
+    return CrewMember(
+      bookingId: json.intVal('booking_id'),
+      labour: LabourRef.fromJson(labour),
+      status: BookingStatus.parse(json.strOrNull('status')),
+      jobStage: JobStage.parse(json.strOrNull('job_stage')),
+      amount: json.intVal('amount'),
+      distanceKm: json['distance_km'] == null ? null : json.dbl('distance_km'),
+      rating: labour.dbl('avg_rating'),
+      ratingsCount: labour.intVal('ratings_count'),
+      city: labour.strOrNull('city'),
+    );
+  }
+
+  /// Said yes (or has already finished the kaam).
+  bool get isConfirmed =>
+      status == BookingStatus.accepted || status == BookingStatus.completed;
+
+  String? distanceLabelIn(AppStrings s) => distanceKm == null
+      ? null
+      : distanceKm! < 1
+      ? s.metresAway((distanceKm! * 1000).round())
+      : s.kmAway(distanceKm!.toStringAsFixed(1));
+}
+
+/// Several workers of one skill asked for in a single go.
+///
+/// The server keeps it filled: a worker who says no, pulls out, or never
+/// answers hands their place to the next nearest worker.
+@immutable
+class Crew {
+  const Crew({
+    required this.id,
+    required this.status,
+    required this.size,
+    required this.confirmed,
+    required this.pending,
+    required this.openSlots,
+    this.replaced = 0,
+    this.exhausted = false,
+    this.skillName,
+    this.workDate,
+    this.startTime,
+    this.dayType = DayType.full,
+    this.address,
+    this.city,
+    this.site,
+    this.members = const [],
+  });
+
+  final int id;
+  final CrewStatus status;
+
+  /// How many workers were asked for.
+  final int size;
+
+  /// Accepted (or already done).
+  final int confirmed;
+
+  /// Asked and still waiting on an answer.
+  final int pending;
+
+  /// Places with nobody asked yet — there was no one left to ask.
+  final int openSlots;
+
+  /// Places that changed hands because somebody refused or pulled out.
+  final int replaced;
+
+  /// Places are empty *and* nobody nearby is left to ask right now.
+  final bool exhausted;
+  final String? skillName;
+  final DateTime? workDate;
+  final String? startTime;
+  final DayType dayType;
+  final String? address;
+  final String? city;
+  final GeoPoint? site;
+  final List<CrewMember> members;
+
+  factory Crew.fromJson(Map<String, dynamic> json) => Crew(
+    id: json.intVal('id'),
+    status: CrewStatus.parse(json.strOrNull('status')),
+    size: json.intVal('size'),
+    confirmed: json.intVal('confirmed'),
+    pending: json.intVal('pending'),
+    openSlots: json.intVal('open_slots'),
+    replaced: json.intVal('replaced'),
+    exhausted: json.flag('exhausted'),
+    skillName: json.mapOrNull('skill')?.strOrNull('name'),
+    workDate: json.date('work_date'),
+    startTime: json.strOrNull('start_time'),
+    dayType: DayType.parse(json.strOrNull('day_type')),
+    address: json.strOrNull('address'),
+    city: json.strOrNull('city'),
+    site: GeoPoint.fromJson(json),
+    members: json.listOfMaps('members').map(CrewMember.fromJson).toList(),
+  );
+
+  bool get isCancelled => status == CrewStatus.cancelled;
+  bool get isFilled => status == CrewStatus.filled;
+
+  /// Worth polling: a place is still empty or an answer is still awaited.
+  bool get isLive => !isCancelled && (pending > 0 || openSlots > 0);
+
+  /// 0–1 for the progress bar.
+  double get progress => size == 0 ? 0 : (confirmed / size).clamp(0.0, 1.0);
+}
+
 @immutable
 class Review {
   const Review({
@@ -558,12 +767,19 @@ class Booking {
     this.paymentMode,
     this.completionResponse,
     this.completionRemark,
+    this.crewId,
+    this.crewSize,
   });
 
   final int id;
   final LabourRef labour;
   final BookingStatus status;
   final JobStage jobStage;
+
+  /// Set when this worker was asked as part of a crew booking, so the card can
+  /// say so and lead to the crew's status. Null for an ordinary booking.
+  final int? crewId;
+  final int? crewSize;
 
   /// `agreed_price` once negotiated, else `offered_amount` — matching
   /// `Booking::finalAmount()`.
@@ -653,6 +869,8 @@ class Booking {
       paymentMode: json.strOrNull('payment_mode'),
       completionResponse: json.strOrNull('completion_response'),
       completionRemark: json.strOrNull('completion_remark'),
+      crewId: json['crew_id'] == null ? null : json.intVal('crew_id'),
+      crewSize: json.mapOrNull('crew')?.intVal('size'),
     );
   }
 
@@ -767,6 +985,8 @@ class Booking {
     paymentMode: paymentMode ?? this.paymentMode,
     completionResponse: completionResponse ?? this.completionResponse,
     completionRemark: completionRemark ?? this.completionRemark,
+    crewId: crewId,
+    crewSize: crewSize,
   );
 }
 

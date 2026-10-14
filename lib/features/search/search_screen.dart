@@ -18,9 +18,23 @@ import '../../widgets/kw_field.dart';
 import '../../widgets/kw_scaffold.dart';
 import '../labour_detail/labour_detail_screen.dart';
 import '../location/location_picker_screen.dart';
+import 'widgets/crew_booking_sheet.dart';
+import 'widgets/crew_group_header.dart';
 import 'widgets/filter_sheet.dart';
 import 'widgets/labour_card.dart';
 import 'widgets/search_map.dart';
+
+/// What one search came back with. An ordinary search is a flat list; a crew
+/// search ("I need 4 painters") is the same workers in same-area [groups], and
+/// [labours] is those workers flattened so the map still has every pin.
+class _SearchResult {
+  const _SearchResult({this.labours = const [], this.groups = const []});
+
+  final List<Labour> labours;
+  final List<LabourGroup> groups;
+
+  bool get isGrouped => groups.isNotEmpty;
+}
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -33,7 +47,7 @@ class _SearchScreenState extends State<SearchScreen> {
   final _query = TextEditingController();
   final _sheetController = DraggableScrollableController();
 
-  late final Loadable<List<Labour>> _results = Loadable(_fetch);
+  late final Loadable<_SearchResult> _results = Loadable(_fetch);
   late final Loadable<List<Skill>> _skills = Loadable(
     () => context.repo.skills(),
   );
@@ -81,10 +95,27 @@ class _SearchScreenState extends State<SearchScreen> {
     await LocationPickerScreen.push(context);
   }
 
-  Future<List<Labour>> _fetch() async {
+  Future<_SearchResult> _fetch() async {
     final origin = _origin;
     _fetchedFrom = origin;
-    
+
+    // "I need 4 painters": the server bunches the workers by neighbourhood.
+    // The name box, rate cap and sort do not apply here — they would pick
+    // workers out of a group and leave it short of the size that was asked for.
+    if (_filters.isCrew) {
+      final groups = await context.repo.labourGroups(
+        lat: origin.lat,
+        lng: origin.lng,
+        skillId: _filters.skillId!,
+        count: _filters.crewSize,
+        radiusKm: _filters.radiusKm,
+      );
+      return _SearchResult(
+        labours: [for (final group in groups) ...group.workers],
+        groups: groups,
+      );
+    }
+
     // Fetch all labours from the new API
     final allLabours = await context.repo.allLaboursForSearch();
     
@@ -110,7 +141,7 @@ class _SearchScreenState extends State<SearchScreen> {
       return l.copyWith(distanceKm: origin.distanceKmTo(labourPos));
     }).toList();
 
-    return _filters.applyLocal(filtered);
+    return _SearchResult(labours: _filters.applyLocal(filtered));
   }
 
   void _onQueryChanged(String value) {
@@ -173,8 +204,9 @@ class _SearchScreenState extends State<SearchScreen> {
             child: ListenableBuilder(
               listenable: _results,
               builder: (context, _) {
-                final rows = _results.value ?? const <Labour>[];
-                
+                final result = _results.value ?? const _SearchResult();
+                final rows = result.labours;
+
                 return Stack(
                   children: [
                     // Background Map
@@ -202,7 +234,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
 
                     // Draggable Labour List
-                    _draggableList(rows),
+                    _draggableList(result),
 
                     // Floating Location/Re-center button
                     Positioned(
@@ -368,7 +400,9 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _draggableList(List<Labour> rows) {
+  Widget _draggableList(_SearchResult result) {
+    final rows = result.labours;
+
     return DraggableScrollableSheet(
       controller: _sheetController,
       initialChildSize: 0.4,
@@ -402,19 +436,28 @@ class _SearchScreenState extends State<SearchScreen> {
               
               // Header
               Padding(
-                padding: const EdgeInsets.only(left: Gap.xl, right: Gap.xl, bottom: Gap.md),
-                child: _listHeader(rows.length),
+                padding: const EdgeInsets.only(
+                  left: Gap.xl,
+                  right: Gap.xl,
+                  bottom: Gap.md,
+                ),
+                child: _listHeader(result),
               ),
+
+              // Crew search: what is being asked for, and how to change it.
+              _crewBanner(),
 
               // List
               Expanded(
                 child: _results.isInitialLoad
                     ? _skeletonList()
                     : rows.isEmpty
-                        ? _emptyState()
-                        : _results.error != null
-                            ? _errorState()
-                            : _actualList(rows, scrollController),
+                    ? _emptyState()
+                    : _results.error != null
+                    ? _errorState()
+                    : result.isGrouped
+                    ? _groupedList(result.groups, scrollController)
+                    : _actualList(rows, scrollController),
               ),
             ],
           ),
@@ -423,8 +466,9 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _listHeader(int count) {
+  Widget _listHeader(_SearchResult result) {
     final s = context.s;
+    final count = result.labours.length;
     return Row(
       children: [
         Expanded(
@@ -432,33 +476,41 @@ class _SearchScreenState extends State<SearchScreen> {
             _results.isInitialLoad
                 ? s.searching
                 : count == 0
-                    ? s.noneFound
-                    : s.labourFound(count),
+                ? s.noneFound
+                : result.isGrouped
+                ? s.crewAreasFound(result.groups.length, count)
+                : s.labourFound(count),
             style: AppType.bodyStrong,
           ),
         ),
-        Pressable(
-          onTap: _openSort,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.canvas,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.sort_rounded, size: 14),
-                Gap.hSm,
-                Text(
-                  _filters.sort.labelIn(s),
-                  style: AppType.buttonSmall.copyWith(fontSize: 12),
-                ),
-              ],
+        // A group is already ordered nearest-area-first; re-sorting it by rate
+        // or rating would scramble the very thing that makes it a group.
+        if (!result.isGrouped)
+          Pressable(
+            onTap: _openSort,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Gap.lg,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.canvas,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.sort_rounded, size: 14),
+                  Gap.hSm,
+                  Text(
+                    _filters.sort.labelIn(s),
+                    style: AppType.buttonSmall.copyWith(fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -481,6 +533,117 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       },
     );
+  }
+
+  String? get _crewSkillName => _skills.value
+      ?.where((skill) => skill.id == _filters.skillId)
+      .firstOrNull
+      ?.name;
+
+  /// "4 Painter needed ✕" while a crew search is on — and, when a count has
+  /// been picked with no work type to go with it, the nudge to pick one (a
+  /// crew of nothing in particular has no groups to show).
+  Widget _crewBanner() {
+    if (_filters.crewSize <= 1) return const SizedBox.shrink();
+
+    final s = context.s;
+    final needsSkill = _filters.skillId == null;
+    final label = needsSkill
+        ? s.crewPickSkill
+        : s.crewActiveChip(_filters.crewSize, _crewSkillName ?? '');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Gap.xl, 0, Gap.xl, Gap.md),
+      child: Pressable(
+        onTap: needsSkill
+            ? _openFilters
+            : () {
+                setState(() => _filters = _filters.copyWith(crewSize: 1));
+                _results.refetchWith(_fetch);
+              },
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Gap.xl,
+            vertical: Gap.md,
+          ),
+          decoration: BoxDecoration(
+            color: needsSkill ? AppColors.canvas : AppColors.yellowLight,
+            borderRadius: Radii.rPill,
+            border: Border.all(
+              color: needsSkill ? AppColors.border : AppColors.yellow,
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.groups_rounded, size: 16),
+              Gap.hMd,
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppType.buttonSmall.copyWith(fontSize: 12),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (!needsSkill) const Icon(Icons.close_rounded, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Same-area groups, each headed by its area and booked as one, with a
+  /// horizontal line before the next area starts.
+  Widget _groupedList(
+    List<LabourGroup> groups,
+    ScrollController scrollController,
+  ) {
+    final s = context.s;
+
+    final items = <Widget>[
+      for (final (i, group) in groups.indexed) ...[
+        if (i > 0) AreaDivider(label: s.crewNextArea),
+        CrewGroupHeader(group: group, onBook: () => _bookGroup(group)),
+        for (final labour in group.workers)
+          LabourCard(
+            labour: labour,
+            selected: labour.id == _selectedId,
+            onTap: () => _openDetail(labour),
+            onConnect: () => _connect(labour),
+          ),
+      ],
+    ];
+
+    return ListView.builder(
+      controller: scrollController,
+      padding: EdgeInsets.fromLTRB(
+        Gap.lg,
+        0,
+        Gap.lg,
+        MediaQuery.of(context).padding.bottom + Gap.xl,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, i) => items[i],
+    );
+  }
+
+  Future<void> _bookGroup(LabourGroup group) async {
+    final skillId = _filters.skillId;
+    if (skillId == null) return;
+
+    final crew = await CrewBookingSheet.show(
+      context,
+      group: group,
+      skillId: skillId,
+      skillName: _crewSkillName ?? '',
+      size: _filters.crewSize,
+      origin: _origin,
+      radiusKm: _filters.radiusKm,
+    );
+    if (crew == null || !mounted) return;
+
+    await Navigator.of(context).pushNamed(Routes.crewStatus, arguments: crew);
   }
 
   Widget _skeletonList() {

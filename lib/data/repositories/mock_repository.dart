@@ -161,6 +161,44 @@ class MockRepository implements KaamWalaRepository {
   Future<List<Labour>> allLaboursForSearch() => _delayed(Mock.labours);
 
   @override
+  Future<List<LabourGroup>> labourGroups({
+    required double lat,
+    required double lng,
+    required int skillId,
+    required int count,
+    int? radiusKm,
+  }) {
+    final pool =
+        Mock.labours
+            .where(
+              (l) =>
+                  l.skills.any((s) => s.id == skillId) &&
+                  (l.distanceKm ?? 0) <= (radiusKm ?? 25),
+            )
+            .toList()
+          ..sort((a, b) => (a.distanceKm ?? 0).compareTo(b.distanceKm ?? 0));
+
+    // The demo has no real map to cluster on, so neighbours are simply the next
+    // workers down the distance-ordered list.
+    final groups = <LabourGroup>[];
+    for (var i = 0; i < pool.length; i += count) {
+      final end = i + count > pool.length ? pool.length : i + count;
+      final chunk = pool.sublist(i, end);
+      groups.add(
+        LabourGroup(
+          index: groups.length + 1,
+          needed: count,
+          workers: chunk,
+          distanceKm: chunk.first.distanceKm ?? 0,
+          spreadKm: 0.8,
+          area: chunk.first.city,
+        ),
+      );
+    }
+    return _delayed(groups);
+  }
+
+  @override
   Future<List<Skill>> skills() => _delayed(Mock.allSkills);
 
   /// The demo build has no admin panel behind it, so it serves the copy
@@ -497,6 +535,75 @@ class MockRepository implements KaamWalaRepository {
       destination: booking.site!,
     );
     return _delayed(booking);
+  }
+
+  /// Crews booked in this demo session. Acceptances arrive on a clock rather
+  /// than from a server, one worker every few seconds, so the status screen has
+  /// something to animate.
+  final Map<int, _MockCrew> _crews = {};
+
+  @override
+  Future<Crew> createCrew({
+    required int skillId,
+    required int size,
+    List<int> labourIds = const [],
+    required DateTime workDate,
+    String? startTime,
+    required DayType dayType,
+    required String address,
+    String? city,
+    required double latitude,
+    required double longitude,
+    String? notes,
+    int? radiusKm,
+  }) async {
+    final skill = Mock.allSkills.firstWhere((s) => s.id == skillId);
+    final picked = [
+      for (final id in labourIds) Mock.labourById(id),
+    ].take(size).toList();
+
+    // Without a picked group, take the nearest workers with the skill.
+    final workers = picked.isNotEmpty
+        ? picked
+        : (Mock.labours
+                  .where((l) => l.skills.any((s) => s.id == skillId))
+                  .toList()
+                ..sort(
+                  (a, b) => (a.distanceKm ?? 0).compareTo(b.distanceKm ?? 0),
+                ))
+              .take(size)
+              .toList();
+
+    if (workers.isEmpty) {
+      throw const ApiException(
+        'Abhi paas mein is kaam ke liye koi kaam wala available nahi hai.',
+        statusCode: 422,
+      );
+    }
+
+    final crew = _MockCrew(
+      id: DateTime.now().millisecondsSinceEpoch % 100000,
+      size: size,
+      workers: workers,
+      skillName: skill.name,
+      workDate: workDate,
+      startTime: startTime,
+      dayType: dayType,
+      address: address,
+      city: city,
+      site: GeoPoint(latitude, longitude),
+    );
+    _crews[crew.id] = crew;
+    return _delayed(crew.snapshot());
+  }
+
+  @override
+  Future<Crew> crew(int crewId) => _delayed(_crews[crewId]!.snapshot());
+
+  @override
+  Future<Crew> cancelCrew(int crewId) async {
+    final crew = _crews[crewId]!..cancelled = true;
+    return _delayed(crew.snapshot());
   }
 
   @override
@@ -1086,6 +1193,87 @@ class _SimulatedJob {
       stageSource: arrivalConfirmed ? 'code' : 'auto',
       canTerminate: termination == null,
       termination: termination,
+    );
+  }
+}
+
+/// A crew booked in the demo. Acceptances come on a clock — one worker every
+/// [_secondsPerAcceptance] seconds — so the status screen fills up by itself.
+class _MockCrew {
+  _MockCrew({
+    required this.id,
+    required this.size,
+    required this.workers,
+    required this.skillName,
+    required this.workDate,
+    required this.dayType,
+    required this.address,
+    this.startTime,
+    this.city,
+    this.site,
+  }) : startedAt = DateTime.now();
+
+  static const _secondsPerAcceptance = 4;
+
+  final int id;
+  final int size;
+  final List<Labour> workers;
+  final String skillName;
+  final DateTime workDate;
+  final String? startTime;
+  final DayType dayType;
+  final String address;
+  final String? city;
+  final GeoPoint? site;
+  final DateTime startedAt;
+  bool cancelled = false;
+
+  Crew snapshot() {
+    final elapsed = DateTime.now().difference(startedAt).inSeconds;
+    final accepted = cancelled
+        ? 0
+        : (elapsed ~/ _secondsPerAcceptance).clamp(0, workers.length);
+
+    final members = [
+      for (var i = 0; i < workers.length; i++)
+        if (!cancelled)
+          CrewMember(
+            bookingId: id * 10 + i,
+            labour: workers[i].ref,
+            status: i < accepted
+                ? BookingStatus.accepted
+                : BookingStatus.pending,
+            amount: workers[i].dailyRate,
+            distanceKm: workers[i].distanceKm,
+            rating: workers[i].avgRating,
+            ratingsCount: workers[i].ratingsCount,
+            city: workers[i].city,
+          ),
+    ];
+
+    final pending = cancelled ? 0 : workers.length - accepted;
+    final openSlots = cancelled ? 0 : size - workers.length;
+
+    return Crew(
+      id: id,
+      status: cancelled
+          ? CrewStatus.cancelled
+          : accepted >= size
+          ? CrewStatus.filled
+          : CrewStatus.searching,
+      size: size,
+      confirmed: accepted,
+      pending: pending,
+      openSlots: openSlots,
+      exhausted: openSlots > 0,
+      skillName: skillName,
+      workDate: workDate,
+      startTime: startTime,
+      dayType: dayType,
+      address: address,
+      city: city,
+      site: site,
+      members: members,
     );
   }
 }

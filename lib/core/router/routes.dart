@@ -6,6 +6,7 @@ import '../../features/auth/otp_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/booking_detail/booking_detail_screen.dart';
+import '../../features/crew/crew_status_screen.dart';
 import '../../features/labour_detail/labour_detail_screen.dart';
 import '../../features/search/labours_map_screen.dart';
 import '../../features/shell/home_shell.dart';
@@ -36,6 +37,10 @@ abstract final class Routes {
   static const bookingDetail = '/booking';
 
   static const tracking = '/track';
+
+  /// A crew booking filling up. Takes a [Crew] (painted at once while the first
+  /// poll is on its way) or a bare crew id.
+  static const crewStatus = '/crew';
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) =>
       switch (settings.name) {
@@ -72,6 +77,11 @@ abstract final class Routes {
           TrackingScreen(booking: settings.arguments! as Booking),
           settings,
         ),
+        crewStatus => _slideUp(switch (settings.arguments) {
+          final Crew crew => CrewStatusScreen(crewId: crew.id, preview: crew),
+          final int id => CrewStatusScreen(crewId: id),
+          _ => const SizedBox.shrink(),
+        }, settings),
         _ => null,
       };
 

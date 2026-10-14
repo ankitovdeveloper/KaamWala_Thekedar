@@ -168,7 +168,7 @@ class _BookingSheetState extends State<BookingSheet> {
                   separatorBuilder: (_, _) => Gap.hMd,
                   itemBuilder: (context, i) {
                     final date = DateTime.now().add(Duration(days: i));
-                    return _DayChip(
+                    return DayChip(
                       weekday: i == 0
                           ? s.today
                           : i == 1
@@ -187,7 +187,7 @@ class _BookingSheetState extends State<BookingSheet> {
               Row(
                 children: [
                   Expanded(
-                    child: _TypeChip(
+                    child: TypeChip(
                       label: s.fullDay,
                       sub: s.eightHours,
                       selected: _dayType == DayType.full,
@@ -196,7 +196,7 @@ class _BookingSheetState extends State<BookingSheet> {
                   ),
                   Gap.hLg,
                   Expanded(
-                    child: _TypeChip(
+                    child: TypeChip(
                       label: s.halfDay,
                       sub: s.fourHours,
                       selected: _dayType == DayType.half,
@@ -281,8 +281,9 @@ class _BookingSheetState extends State<BookingSheet> {
   }
 }
 
-class _DayChip extends StatelessWidget {
-  const _DayChip({
+class DayChip extends StatelessWidget {
+  const DayChip({
+    super.key,
     required this.weekday,
     required this.day,
     required this.month,
@@ -349,8 +350,9 @@ class _DayChip extends StatelessWidget {
   }
 }
 
-class _TypeChip extends StatelessWidget {
-  const _TypeChip({
+class TypeChip extends StatelessWidget {
+  const TypeChip({
+    super.key,
     required this.label,
     required this.sub,
     required this.selected,

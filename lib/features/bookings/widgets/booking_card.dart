@@ -22,6 +22,7 @@ class BookingCard extends StatelessWidget {
     required this.onTrack,
     required this.onComplete,
     required this.onPaymentDone,
+    this.onCrew,
   });
 
   final Booking booking;
@@ -45,6 +46,10 @@ class BookingCard extends StatelessWidget {
   /// job up. Two taps because they are two facts, usually hours apart.
   final VoidCallback onComplete;
   final VoidCallback onPaymentDone;
+
+  /// Opens the crew this worker was asked as part of. Null where the card has no
+  /// way to get there; the chip then just says it is a crew booking.
+  final VoidCallback? onCrew;
 
   (String, KwStatusTone) _status(AppStrings s) => switch (booking.status) {
     BookingStatus.accepted => (s.statusConfirmed, KwStatusTone.confirmed),
@@ -90,6 +95,19 @@ class BookingCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (booking.crewId != null) ...[
+                        Gap.vXs,
+                        GestureDetector(
+                          onTap: onCrew,
+                          child: KwPill(
+                            label: s.crewBadge(booking.crewSize ?? 0),
+                            background: AppColors.yellowLight,
+                            foreground: AppColors.pendingText,
+                            dense: true,
+                          ),
+                        ),
+                        Gap.vXs,
+                      ],
                       Row(
                         children: [
                           const Icon(

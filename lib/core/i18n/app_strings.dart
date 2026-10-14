@@ -760,6 +760,59 @@ class AppStrings {
   String get claimSubmitting => 'Bhej rahe hain…';
   String get claimDoneTitle => 'Claim bhej diya';
   String get claimDoneMsg => 'Admin jaldi approve karega. Update yahin dikhega.';
+
+  // ── Crew booking (several workers of one skill at once) ───────────────────
+
+  String get crewSizeTitle => 'Kitne kaam wale chahiye?';
+  String get crewSolo => 'Akela';
+  String get crewPair => 'Jodi';
+  String get crewTeam => 'Team';
+  String get crewCrew => 'Crew';
+  String get crewOtherNumber => 'Ya apni sankhya chunein';
+  String crewHelper(int n) =>
+      'Hum paas-paas rehne wale $n kaam wale dhundhenge. Koi mana kare to '
+      'agle nearest ko request chali jaati hai, jab tak sab $n accept na kar lein.';
+  String get crewPickSkill =>
+      'Group dekhne ke liye upar se kaam ka type bhi chunein.';
+  String crewAreasFound(int areas, int workers) =>
+      '$areas area · $workers kaam wale';
+  String crewActiveChip(int n, String skill) => '$n $skill chahiye';
+  String crewAreaTitle(int n) => 'Area $n';
+  String get crewNextArea => 'Agla area';
+  String crewWithin(String km) => 'Aapas mein $km km ke andar';
+  String crewOnlyOf(int have, int need) => 'Sirf $have / $need';
+  String crewBookGroup(int n) => '$n ko book karein';
+  String crewTotalEstimate(int n) => 'Andaaza ($n kaam wale)';
+  String get crewEachOwnRate =>
+      'Har kaam wale ko unka apna rate milega. Badle hue kaam wale ka rate '
+      'thoda alag ho sakta hai.';
+  String crewBookTitle(int n, String skill) => '$n $skill book karein';
+  String get crewConfirm => 'Crew booking bhejein';
+  String get crewStatusTitle => 'Crew status';
+  String crewConfirmedOf(int confirmed, int size) =>
+      '$size me se $confirmed confirm';
+  String get crewAccepted => 'Accept kiya';
+  String get crewWaiting => 'Jawab ka intezar';
+  String get crewSearching => 'Dhundh rahe hain…';
+  String crewMoreNotified(int n) =>
+      '$n aur kaam walon ko request bheji ja rahi hai';
+  String get crewNoMoreNearby =>
+      'Abhi paas mein aur koi kaam wala nahi mila. Hum dekhte rahenge.';
+  String get crewReplaceNote =>
+      'Agar koi kaam wala cancel karta hai to uski jagah apne aap khul jaati '
+      'hai aur agle nearest kaam wale ko request jaati hai — aapko dobara '
+      'shuru nahi karna padta.';
+  String crewReplacedNote(int n) =>
+      '$n kaam wale ne mana kiya — unki jagah dusre ko bheja gaya.';
+  String get crewFilled => 'Crew poori ho gayi';
+  String get crewCancelledTitle => 'Crew cancel ho gayi';
+  String get crewCancelAction => 'Crew cancel karein';
+  String get crewCancelConfirmTitle => 'Poori crew cancel karein?';
+  String get crewCancelConfirmBody =>
+      'Jinhone abhi accept nahi kiya unki request wapas le li jayegi, aur jo '
+      'abhi kaam par nahi pahunche unki booking cancel ho jayegi.';
+  String get crewDone => 'Theek hai';
+  String crewBadge(int n) => 'Crew · $n log';
 }
 
 // ── Hindi ───────────────────────────────────────────────────────────────────
@@ -1872,6 +1925,94 @@ class _Hindi extends AppStrings {
   String get claimDoneTitle => 'क्लेम भेज दिया';
   @override
   String get claimDoneMsg => 'एडमिन जल्द ही अप्रूव करेगा। अपडेट यहीं दिखेगा।';
+
+  // ── Crew booking ──────────────────────────────────────────────────────────
+
+  @override
+  String get crewSizeTitle => 'कितने कारीगर चाहिए?';
+  @override
+  String get crewSolo => 'अकेला';
+  @override
+  String get crewPair => 'जोड़ी';
+  @override
+  String get crewTeam => 'टीम';
+  @override
+  String get crewCrew => 'क्रू';
+  @override
+  String get crewOtherNumber => 'या अपनी संख्या चुनें';
+  @override
+  String crewHelper(int n) =>
+      'हम पास-पास रहने वाले $n कारीगर ढूँढेंगे। कोई मना करे तो अगले सबसे '
+      'नज़दीकी को रिक्वेस्ट चली जाती है, जब तक सभी $n एक्सेप्ट न कर लें।';
+  @override
+  String get crewPickSkill =>
+      'ग्रुप देखने के लिए ऊपर से काम का प्रकार भी चुनें।';
+  @override
+  String crewAreasFound(int areas, int workers) =>
+      '$areas इलाके · $workers कारीगर';
+  @override
+  String crewActiveChip(int n, String skill) => '$n $skill चाहिए';
+  @override
+  String crewAreaTitle(int n) => 'इलाका $n';
+  @override
+  String get crewNextArea => 'अगला इलाका';
+  @override
+  String crewWithin(String km) => 'आपस में $km किमी के अंदर';
+  @override
+  String crewOnlyOf(int have, int need) => 'सिर्फ़ $have / $need';
+  @override
+  String crewBookGroup(int n) => '$n को बुक करें';
+  @override
+  String crewTotalEstimate(int n) => 'अंदाज़ा ($n कारीगर)';
+  @override
+  String get crewEachOwnRate =>
+      'हर कारीगर को उसका अपना रेट मिलेगा। बदले गए कारीगर का रेट थोड़ा अलग '
+      'हो सकता है।';
+  @override
+  String crewBookTitle(int n, String skill) => '$n $skill बुक करें';
+  @override
+  String get crewConfirm => 'क्रू बुकिंग भेजें';
+  @override
+  String get crewStatusTitle => 'क्रू स्टेटस';
+  @override
+  String crewConfirmedOf(int confirmed, int size) =>
+      '$size में से $confirmed कन्फर्म';
+  @override
+  String get crewAccepted => 'एक्सेप्ट किया';
+  @override
+  String get crewWaiting => 'जवाब का इंतज़ार';
+  @override
+  String get crewSearching => 'ढूँढ रहे हैं…';
+  @override
+  String crewMoreNotified(int n) =>
+      '$n और कारीगरों को रिक्वेस्ट भेजी जा रही है';
+  @override
+  String get crewNoMoreNearby =>
+      'अभी आस-पास और कोई कारीगर नहीं मिला। हम देखते रहेंगे।';
+  @override
+  String get crewReplaceNote =>
+      'अगर कोई कारीगर कैंसिल करता है तो उसकी जगह अपने आप खुल जाती है और '
+      'अगले नज़दीकी कारीगर को रिक्वेस्ट जाती है — आपको दोबारा शुरू नहीं करना '
+      'पड़ता।';
+  @override
+  String crewReplacedNote(int n) =>
+      '$n कारीगर ने मना किया — उनकी जगह दूसरे को भेजा गया।';
+  @override
+  String get crewFilled => 'क्रू पूरी हो गई';
+  @override
+  String get crewCancelledTitle => 'क्रू कैंसिल हो गई';
+  @override
+  String get crewCancelAction => 'क्रू कैंसिल करें';
+  @override
+  String get crewCancelConfirmTitle => 'पूरी क्रू कैंसिल करें?';
+  @override
+  String get crewCancelConfirmBody =>
+      'जिन्होंने अभी एक्सेप्ट नहीं किया उनकी रिक्वेस्ट वापस ले ली जाएगी, और '
+      'जो अभी काम पर नहीं पहुँचे उनकी बुकिंग कैंसिल हो जाएगी।';
+  @override
+  String get crewDone => 'ठीक है';
+  @override
+  String crewBadge(int n) => 'क्रू · $n लोग';
 }
 
 // ── English ─────────────────────────────────────────────────────────────────
@@ -2953,6 +3094,93 @@ class _English extends AppStrings {
   @override
   String get claimDoneMsg =>
       'Admin will approve it soon. You will get an update here.';
+
+  // ── Crew booking ──────────────────────────────────────────────────────────
+
+  @override
+  String get crewSizeTitle => 'How many workers?';
+  @override
+  String get crewSolo => 'Solo';
+  @override
+  String get crewPair => 'Pair';
+  @override
+  String get crewTeam => 'Team';
+  @override
+  String get crewCrew => 'Crew';
+  @override
+  String get crewOtherNumber => 'Or pick your own number';
+  @override
+  String crewHelper(int n) =>
+      "We'll find $n workers who live near each other. If one says no, the "
+      'next nearest is asked — until all $n have accepted.';
+  @override
+  String get crewPickSkill => 'Also pick a type of work above to see groups.';
+  @override
+  String crewAreasFound(int areas, int workers) =>
+      '$areas ${areas == 1 ? 'area' : 'areas'} · $workers workers';
+  @override
+  String crewActiveChip(int n, String skill) => '$n $skill needed';
+  @override
+  String crewAreaTitle(int n) => 'Area $n';
+  @override
+  String get crewNextArea => 'Next area';
+  @override
+  String crewWithin(String km) => 'Within $km km of each other';
+  @override
+  String crewOnlyOf(int have, int need) => 'Only $have of $need';
+  @override
+  String crewBookGroup(int n) => 'Book these $n';
+  @override
+  String crewTotalEstimate(int n) => 'Estimate ($n workers)';
+  @override
+  String get crewEachOwnRate =>
+      'Each worker is paid their own rate. A replacement worker may charge a '
+      'little differently.';
+  @override
+  String crewBookTitle(int n, String skill) => 'Book $n $skill';
+  @override
+  String get crewConfirm => 'Send crew booking';
+  @override
+  String get crewStatusTitle => 'Crew status';
+  @override
+  String crewConfirmedOf(int confirmed, int size) =>
+      '$confirmed of $size confirmed';
+  @override
+  String get crewAccepted => 'Accepted';
+  @override
+  String get crewWaiting => 'Waiting for reply';
+  @override
+  String get crewSearching => 'Searching…';
+  @override
+  String crewMoreNotified(int n) =>
+      '$n more ${n == 1 ? 'worker is' : 'workers are'} being notified';
+  @override
+  String get crewNoMoreNearby =>
+      'No more workers nearby right now. We will keep looking.';
+  @override
+  String get crewReplaceNote =>
+      "If a worker cancels, their slot reopens on its own and the next "
+      "nearest worker is notified — you don't start over.";
+  @override
+  String crewReplacedNote(int n) =>
+      '$n ${n == 1 ? 'worker' : 'workers'} said no — someone else was asked '
+      'instead.';
+  @override
+  String get crewFilled => 'Your crew is complete';
+  @override
+  String get crewCancelledTitle => 'Crew cancelled';
+  @override
+  String get crewCancelAction => 'Cancel crew';
+  @override
+  String get crewCancelConfirmTitle => 'Cancel the whole crew?';
+  @override
+  String get crewCancelConfirmBody =>
+      "Requests nobody has accepted yet are withdrawn, and workers who haven't "
+      'reached the site are released.';
+  @override
+  String get crewDone => 'Done';
+  @override
+  String crewBadge(int n) => 'Crew · $n workers';
 }
 
 // ── Bhojpuri ────────────────────────────────────────────────────────────────

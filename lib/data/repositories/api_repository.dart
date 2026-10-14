@@ -171,6 +171,27 @@ class ApiRepository implements KaamWalaRepository {
   }
 
   @override
+  Future<List<LabourGroup>> labourGroups({
+    required double lat,
+    required double lng,
+    required int skillId,
+    required int count,
+    int? radiusKm,
+  }) async {
+    final data = await _api.get(
+      'thekedar/labour/groups',
+      query: {
+        'lat': lat,
+        'lng': lng,
+        'skill_id': skillId,
+        'count': count,
+        'radius': radiusKm ?? ApiConfig.defaultRadiusKm,
+      },
+    );
+    return _obj(data).listOfMaps('groups').map(LabourGroup.fromJson).toList();
+  }
+
+  @override
   Future<List<Skill>> skills() async =>
       rowsOf(await _api.get('skills')).map(Skill.fromJson).toList();
 
@@ -229,6 +250,51 @@ class ApiRepository implements KaamWalaRepository {
     );
     return Booking.fromJson(_obj(data));
   }
+
+  @override
+  Future<Crew> createCrew({
+    required int skillId,
+    required int size,
+    List<int> labourIds = const [],
+    required DateTime workDate,
+    String? startTime,
+    required DayType dayType,
+    required String address,
+    String? city,
+    required double latitude,
+    required double longitude,
+    String? notes,
+    int? radiusKm,
+  }) async {
+    final data = await _api.post(
+      'thekedar/crews',
+      body: {
+        'skill_id': skillId,
+        'size': size,
+        if (labourIds.isNotEmpty) 'labour_ids': labourIds,
+        // Bare Y-m-d in local time, as for a single booking.
+        'work_date': _ymd(workDate),
+        'start_time': ?startTime,
+        'day_type': dayType.name,
+        'duration_hours': dayType == DayType.full ? 8 : 4,
+        'address': address,
+        'city': ?city,
+        'latitude': latitude,
+        'longitude': longitude,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+        'radius': radiusKm ?? ApiConfig.defaultRadiusKm,
+      },
+    );
+    return Crew.fromJson(_obj(data));
+  }
+
+  @override
+  Future<Crew> crew(int crewId) async =>
+      Crew.fromJson(_obj(await _api.get('thekedar/crews/$crewId')));
+
+  @override
+  Future<Crew> cancelCrew(int crewId) async =>
+      Crew.fromJson(_obj(await _api.post('thekedar/crews/$crewId/cancel')));
 
   @override
   Future<Booking> cancelBooking(int bookingId) async => Booking.fromJson(

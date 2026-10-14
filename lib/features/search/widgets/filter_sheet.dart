@@ -27,9 +27,13 @@ class LabourFilters {
     this.availableOnly = true,
     this.radiusKm = ApiConfig.defaultRadiusKm,
     this.sort = LabourSort.distance,
+    this.crewSize = 1,
   });
 
   static const _rateCeiling = 1000.0;
+
+  /// The most workers one crew booking may ask for (`Crew::MAX_SIZE`).
+  static const maxCrewSize = 20;
   static const rateFloor = 200.0;
   static const rateCeiling = _rateCeiling;
 
@@ -40,18 +44,28 @@ class LabourFilters {
   final int radiusKm;
   final LabourSort sort;
 
+  /// How many workers of [skillId] the Thekedar needs. Above one, the search
+  /// groups workers by neighbourhood instead of listing them one by one.
+  final int crewSize;
+
+  /// True when the search should come back as same-area groups. A crew needs a
+  /// skill to be about — "4 workers" of nothing in particular has no groups.
+  bool get isCrew => crewSize > 1 && skillId != null;
+
   bool get isDefault =>
       skillId == null &&
       maxRate >= _rateCeiling &&
       availableOnly &&
-      radiusKm == ApiConfig.defaultRadiusKm;
+      radiusKm == ApiConfig.defaultRadiusKm &&
+      crewSize == 1;
 
   /// Count shown on the Filter button's badge.
   int get activeCount =>
       (skillId != null ? 1 : 0) +
       (maxRate < _rateCeiling ? 1 : 0) +
       (availableOnly ? 0 : 1) +
-      (radiusKm != ApiConfig.defaultRadiusKm ? 1 : 0);
+      (radiusKm != ApiConfig.defaultRadiusKm ? 1 : 0) +
+      (crewSize > 1 ? 1 : 0);
 
   LabourFilters copyWith({
     Object? skillId = _unset,
@@ -59,12 +73,14 @@ class LabourFilters {
     bool? availableOnly,
     int? radiusKm,
     LabourSort? sort,
+    int? crewSize,
   }) => LabourFilters(
     skillId: skillId == _unset ? this.skillId : skillId as int?,
     maxRate: maxRate ?? this.maxRate,
     availableOnly: availableOnly ?? this.availableOnly,
     radiusKm: radiusKm ?? this.radiusKm,
     sort: sort ?? this.sort,
+    crewSize: crewSize ?? this.crewSize,
   );
 
   static const _unset = Object();
@@ -190,26 +206,36 @@ class _FilterSheetState extends State<FilterSheet> {
                   ],
                 ),
               Gap.v24,
-              Row(
-                children: [
-                  Expanded(child: KwSectionTitle(s.maxRate)),
-                  Text(
-                    _draft.maxRate >= LabourFilters.rateCeiling
-                        ? s.noLimit
-                        : '₹${_draft.maxRate.round()}',
-                    style: AppType.bodyStrong,
-                  ),
-                ],
+              KwSectionTitle(s.crewSizeTitle),
+              _CrewSizePicker(
+                size: _draft.crewSize,
+                needsSkill: _draft.skillId == null,
+                onChanged: (n) =>
+                    setState(() => _draft = _draft.copyWith(crewSize: n)),
               ),
-              _slider(
-                value: _draft.maxRate,
-                min: LabourFilters.rateFloor,
-                max: LabourFilters.rateCeiling,
-                divisions: 16,
-                onChanged: (v) =>
-                    setState(() => _draft = _draft.copyWith(maxRate: v)),
-              ),
-              Gap.vXl,
+              Gap.v24,
+              if (_draft.crewSize == 1) ...[
+                Row(
+                  children: [
+                    Expanded(child: KwSectionTitle(s.maxRate)),
+                    Text(
+                      _draft.maxRate >= LabourFilters.rateCeiling
+                          ? s.noLimit
+                          : '₹${_draft.maxRate.round()}',
+                      style: AppType.bodyStrong,
+                    ),
+                  ],
+                ),
+                _slider(
+                  value: _draft.maxRate,
+                  min: LabourFilters.rateFloor,
+                  max: LabourFilters.rateCeiling,
+                  divisions: 16,
+                  onChanged: (v) =>
+                      setState(() => _draft = _draft.copyWith(maxRate: v)),
+                ),
+                Gap.vXl,
+              ],
               Row(
                 children: [
                   Expanded(child: KwSectionTitle(s.howFar)),
@@ -488,6 +514,163 @@ class SortSheet extends StatelessWidget {
           ),
           Gap.v20,
         ],
+      ),
+    );
+  }
+}
+
+/// "How many workers?" — the 1 / 2 / 3 / 5 tiles, plus a stepper for any other
+/// number (a crew of four is as ordinary as a crew of five).
+class _CrewSizePicker extends StatelessWidget {
+  const _CrewSizePicker({
+    required this.size,
+    required this.needsSkill,
+    required this.onChanged,
+  });
+
+  final int size;
+
+  /// No work type picked yet, so a crew has nothing to group.
+  final bool needsSkill;
+  final ValueChanged<int> onChanged;
+
+  static const _presets = [1, 2, 3, 5];
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final labels = {1: s.crewSolo, 2: s.crewPair, 3: s.crewTeam, 5: s.crewCrew};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            for (final n in _presets) ...[
+              Expanded(
+                child: _CountTile(
+                  count: n,
+                  label: labels[n]!,
+                  selected: size == n,
+                  onTap: () => onChanged(n),
+                ),
+              ),
+              if (n != _presets.last) Gap.hMd,
+            ],
+          ],
+        ),
+        Gap.vLg,
+        Row(
+          children: [
+            Expanded(child: Text(s.crewOtherNumber, style: AppType.caption)),
+            _StepButton(
+              icon: Icons.remove_rounded,
+              onTap: size > 1 ? () => onChanged(size - 1) : null,
+            ),
+            SizedBox(
+              width: 44,
+              child: Text(
+                '$size',
+                textAlign: TextAlign.center,
+                style: AppType.h4,
+              ),
+            ),
+            _StepButton(
+              icon: Icons.add_rounded,
+              onTap: size < LabourFilters.maxCrewSize
+                  ? () => onChanged(size + 1)
+                  : null,
+            ),
+          ],
+        ),
+        if (size > 1) ...[
+          Gap.vMd,
+          Text(s.crewHelper(size), style: AppType.caption),
+          if (needsSkill) ...[
+            Gap.vSm,
+            Text(
+              s.crewPickSkill,
+              style: AppType.caption.copyWith(color: AppColors.danger),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+class _CountTile extends StatelessWidget {
+  const _CountTile({
+    required this.count,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int count;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.95,
+      child: AnimatedContainer(
+        duration: Motion.fast,
+        curve: Motion.enter,
+        padding: const EdgeInsets.symmetric(vertical: Gap.xl),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.yellowLight : AppColors.white,
+          borderRadius: Radii.rSm,
+          border: Border.all(
+            color: selected ? AppColors.yellow : AppColors.border,
+            width: selected ? 1.5 : 0.5,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('$count', style: AppType.h3),
+            Text(
+              label.toUpperCase(),
+              style: AppType.nano.copyWith(fontSize: 9),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.9,
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: onTap == null ? AppColors.border : AppColors.black,
+        ),
       ),
     );
   }

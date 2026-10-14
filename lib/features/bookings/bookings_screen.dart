@@ -458,6 +458,11 @@ class _BookingsScreenState extends State<BookingsScreen>
               onReview: () => _review(booking),
               onComplete: () => _complete(booking),
               onPaymentDone: () => _pay(booking),
+              onCrew: booking.crewId == null
+                  ? null
+                  : () => Navigator.of(
+                      context,
+                    ).pushNamed(Routes.crewStatus, arguments: booking.crewId),
               // The tracking screen is where a refusal or a stopped job is
               // learned about, so coming back from it is the one moment this
               // list is guaranteed to be out of date.
