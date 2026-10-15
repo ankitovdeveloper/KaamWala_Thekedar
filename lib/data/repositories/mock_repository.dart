@@ -14,7 +14,15 @@ import 'kaamwala_repository.dart';
 /// Mutations are held in memory for the life of the instance — enough for
 /// cancel / review / save to feel real in a demo.
 class MockRepository implements KaamWalaRepository {
-  MockRepository({this.latency = const Duration(milliseconds: 350)});
+  MockRepository({
+    this.latency = const Duration(milliseconds: 350),
+    this.workerAnswers = true,
+  });
+
+  /// False makes every request go unanswered, so it runs out its answer window
+  /// and cancels itself — the only way to watch that happen without a worker's
+  /// phone to leave alone.
+  final bool workerAnswers;
 
   /// Set to [Duration.zero] in tests so `pumpAndSettle` stays quick.
   final Duration latency;
@@ -241,6 +249,13 @@ class MockRepository implements KaamWalaRepository {
             status: BookingStatus.accepted,
             jobStage: job.stage,
           ),
+          // Nobody answered inside the window: the request cancels itself.
+          final job? when booking.status == BookingStatus.pending &&
+              job.hasExpired =>
+            booking.copyWith(
+              status: BookingStatus.cancelled,
+              cancellationReasonCode: 'expired',
+            ),
           _ => booking,
         },
     ];
@@ -308,6 +323,8 @@ class MockRepository implements KaamWalaRepository {
         outcome: BookingOutcome(
           kind: switch (booking.status) {
             BookingStatus.declined => BookingOutcomeKind.declined,
+            BookingStatus.cancelled when booking.wasExpired =>
+              BookingOutcomeKind.expired,
             BookingStatus.cancelled => BookingOutcomeKind.cancelled,
             BookingStatus.accepted => BookingOutcomeKind.running,
             BookingStatus.completed when booking.completionDisputed =>
@@ -525,6 +542,7 @@ class MockRepository implements KaamWalaRepository {
       status: BookingStatus.pending,
       jobStage: JobStage.pending,
       site: GeoPoint.tryFrom(latitude, longitude) ?? Mock.home,
+      requestExpiresAt: DateTime.now().add(_SimulatedJob.answerWindow),
     );
     _bookings = [booking, ..._bookings];
 
@@ -533,6 +551,10 @@ class MockRepository implements KaamWalaRepository {
     _jobs[booking.id] = _SimulatedJob(
       origin: labour.latLng ?? Mock.home,
       destination: booking.site!,
+      // A worker who never picks up leaves the request to run out its window.
+      acceptAfter: workerAnswers
+          ? const Duration(seconds: 6)
+          : const Duration(days: 1),
     );
     return _delayed(booking);
   }
@@ -1087,6 +1109,11 @@ class _SimulatedJob {
     this.acceptAfter = const Duration(seconds: 6),
   }) : _startedAt = DateTime.now();
 
+  /// How long the worker has to answer before the request cancels itself.
+  static const answerWindow = Duration(
+    seconds: Booking.defaultRequestTtlSeconds,
+  );
+
   final GeoPoint origin;
   final GeoPoint destination;
 
@@ -1104,6 +1131,11 @@ class _SimulatedJob {
   Duration get _elapsed => DateTime.now().difference(_startedAt);
 
   bool get hasAccepted => _elapsed >= acceptAfter;
+
+  /// The window closed with nobody having answered.
+  bool get hasExpired => !hasAccepted && _elapsed >= answerWindow;
+
+  DateTime get expiresAt => _startedAt.add(answerWindow);
 
   /// 0 at the moment of acceptance, 1 on arrival.
   double get _progress {
@@ -1167,6 +1199,17 @@ class _SimulatedJob {
   }
 
   TrackingUpdate sample() {
+    // Nobody answered, so the request withdrew itself.
+    if (hasExpired) {
+      return TrackingUpdate(
+        stage: JobStage.pending,
+        destination: destination,
+        accepted: false,
+        isLive: false,
+        expired: true,
+      );
+    }
+
     // Before acceptance there is deliberately no position: the request is still
     // sitting with the worker, and showing a dot would imply they're moving.
     if (!hasAccepted) {
@@ -1174,6 +1217,8 @@ class _SimulatedJob {
         stage: JobStage.pending,
         destination: destination,
         accepted: false,
+        requestExpiresAt: expiresAt,
+        requestTtlSeconds: Booking.defaultRequestTtlSeconds,
       );
     }
 

@@ -586,6 +586,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen>
         ),
         _ => (s.storyTerminated, null, Icons.report_gmailerrorred_rounded),
       },
+      BookingOutcomeKind.expired => (
+        s.requestExpiredTitle,
+        s.requestExpiredBody(name, Booking.defaultRequestTtlSeconds),
+        Icons.timer_off_outlined,
+      ),
       BookingOutcomeKind.cancelled => (
         s.storyCancelled,
         outcome.cancellationReason,

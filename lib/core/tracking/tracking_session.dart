@@ -54,11 +54,13 @@ class TrackingSession extends ChangeNotifier {
   Object? get fatalError => _latest == null ? _error : null;
 
   /// Nothing left to follow: the job finished, somebody stopped it part-way, or
-  /// the worker turned the request down before it ever started.
+  /// the worker turned the request down, or never answered it in time and it
+  /// cancelled itself, before it ever started.
   bool get isFinished =>
       _latest?.stage == JobStage.completed ||
       _latest?.wasTerminated == true ||
-      _latest?.declined == true;
+      _latest?.declined == true ||
+      _latest?.expired == true;
 
   /// Fetches once immediately, then every [interval].
   void start() {

@@ -9,6 +9,7 @@ import '../../../data/models/models.dart';
 import '../../../data/session.dart';
 import '../../../widgets/kw_button.dart';
 import '../../../widgets/kw_common.dart';
+import '../../../widgets/request_countdown.dart';
 
 class BookingCard extends StatelessWidget {
   const BookingCard({
@@ -23,6 +24,7 @@ class BookingCard extends StatelessWidget {
     required this.onComplete,
     required this.onPaymentDone,
     this.onCrew,
+    this.onRequestExpired,
   });
 
   final Booking booking;
@@ -50,6 +52,10 @@ class BookingCard extends StatelessWidget {
   /// Opens the crew this worker was asked as part of. Null where the card has no
   /// way to get there; the chip then just says it is a crew booking.
   final VoidCallback? onCrew;
+
+  /// The countdown on a pending request ran out. The server is what cancels it,
+  /// so the list reloads to show it.
+  final VoidCallback? onRequestExpired;
 
   (String, KwStatusTone) _status(AppStrings s) => switch (booking.status) {
     BookingStatus.accepted => (s.statusConfirmed, KwStatusTone.confirmed),
@@ -144,6 +150,16 @@ class BookingCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // How long the worker has left to answer. Not for a crew
+                  // member: those requests are passed on rather than cancelled.
+                  if (booking.isAwaitingAnswer && booking.crewId == null) ...[
+                    RequestCountdownLine(
+                      expiresAt: booking.requestExpiresAt!,
+                      labelFor: s.requestCountdownLine,
+                      onExpired: onRequestExpired,
+                    ),
+                    Gap.vXs,
+                  ],
                   _info(Icons.calendar_today_outlined, booking.whenLabelIn(s)),
                   if (booking.address != null) ...[
                     Gap.vXs,

@@ -15,6 +15,7 @@ import '../../widgets/kw_button.dart';
 import '../../widgets/kw_celebration.dart';
 import '../../widgets/kw_common.dart';
 import '../../widgets/kw_scaffold.dart';
+import '../../widgets/request_countdown.dart';
 import '../booking_detail/widgets/payment_sheet.dart';
 import 'widgets/arrival_sheet.dart';
 import 'widgets/end_job_sheet.dart';
@@ -46,13 +47,24 @@ class _TrackingScreenState extends State<TrackingScreen> {
   /// once, and the booking screen keeps the button after that.
   bool _paymentOffered = false;
 
+  /// When the request cancels itself if the worker has not answered. Taken from
+  /// the response that created it (the freshest reading there will be), and only
+  /// from the first poll if this screen was opened some other way. Never
+  /// overwritten by later polls: each one would nudge the ring by a network
+  /// round trip, and the deadline does not move.
+  DateTime? _deadline;
+  int _window = Booking.defaultRequestTtlSeconds;
+
   @override
   void initState() {
     super.initState();
+    _deadline = widget.booking.requestExpiresAt;
+    _window = widget.booking.requestTtlSeconds;
     _session = TrackingSession(
       repository: context.repo,
       bookingId: widget.booking.id,
     )
+      ..addListener(_watchDeadline)
       ..addListener(_watchForAccept)
       ..addListener(_watchForFinish)
       ..start();
@@ -60,11 +72,26 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   @override
   void dispose() {
+    _session.removeListener(_watchDeadline);
     _session.removeListener(_watchForAccept);
     _session.removeListener(_watchForFinish);
     _session.dispose();
     super.dispose();
   }
+
+  void _watchDeadline() {
+    if (_deadline != null) return;
+    final latest = _session.latest;
+    if (latest?.requestExpiresAt case final at?) {
+      _deadline = at;
+      _window = latest!.requestTtlSeconds;
+    }
+  }
+
+  /// The countdown reached zero. Only the server cancels a request, so this is
+  /// one more look at it rather than a decision: the poll that answers is the
+  /// one that turns the screen into "nobody answered".
+  void _onRequestExpired() => _session.refresh();
 
   /// The worker closing the kaam from their side lands here on a poll, like
   /// the accept does — and it is the moment to settle the money.
@@ -182,12 +209,21 @@ class _TrackingScreenState extends State<TrackingScreen> {
                         name: widget.booking.labour.name,
                         at: latest.declinedAt,
                       )
+                    : latest.expired
+                    ? _RequestExpired(
+                        name: widget.booking.labour.name,
+                        labourId: widget.booking.labour.id,
+                        window: _window,
+                      )
                     : switch (latest.position) {
                         // No fix yet: the request is still with the worker, so
                         // there is nothing to plot and a map would just be an
                         // empty city.
                         null => _AwaitingAccept(
                           name: widget.booking.labour.name,
+                          deadline: _deadline,
+                          window: _window,
+                          onExpired: _onRequestExpired,
                         ),
                         final position => TrackingMap(
                           worker: position,
@@ -307,6 +343,17 @@ class _TrackingScreenState extends State<TrackingScreen> {
                       final at? => '${s.rejectedTitle} · ${s.rejectedAt(_clock(at))}',
                       null => s.rejectedTitle,
                     },
+                    style: AppType.bodyStrong.copyWith(
+                      fontSize: 13,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                )
+              else if (update.expired)
+                Padding(
+                  padding: const EdgeInsets.only(top: Gap.xxl),
+                  child: Text(
+                    s.requestExpiredTitle,
                     style: AppType.bodyStrong.copyWith(
                       fontSize: 13,
                       color: AppColors.danger,
@@ -672,39 +719,138 @@ class _RequestRejected extends StatelessWidget {
 /// Deliberately not a map: plotting the worker here would suggest they had
 /// already taken the job and set off.
 class _AwaitingAccept extends StatelessWidget {
-  const _AwaitingAccept({required this.name});
+  const _AwaitingAccept({
+    required this.name,
+    required this.deadline,
+    required this.window,
+    required this.onExpired,
+  });
 
   final String name;
 
+  /// When the request cancels itself. Null on an older backend that has no
+  /// answer window, which gets the plain spinner it always had.
+  final DateTime? deadline;
+  final int window;
+  final VoidCallback onExpired;
+
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: AppColors.surfaceAlt,
-    child: Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Gap.x4l),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 34,
-              height: 34,
-              child: CircularProgressIndicator(strokeWidth: 3),
-            ),
-            Gap.v20,
-            Text(
-              context.s.requestSent,
-              style: AppType.h3,
-              textAlign: TextAlign.center,
-            ),
-            Gap.vXs,
-            Text(
-              context.s.awaitingAccept(name),
-              style: AppType.bodyMuted,
-              textAlign: TextAlign.center,
-            ),
-          ],
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final at = deadline;
+
+    return ColoredBox(
+      color: AppColors.surfaceAlt,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(Gap.x4l),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (at == null)
+                const SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                )
+              else
+                RequestCountdownRing(
+                  expiresAt: at,
+                  totalSeconds: window,
+                  onExpired: onExpired,
+                ),
+              Gap.v20,
+              Text(s.requestSent, style: AppType.h3, textAlign: TextAlign.center),
+              Gap.vXs,
+              Text(
+                s.awaitingAccept(name),
+                style: AppType.bodyMuted,
+                textAlign: TextAlign.center,
+              ),
+              if (at != null) ...[
+                Gap.vMd,
+                Text(
+                  s.requestAnswerHint(window),
+                  style: AppType.caption,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+/// Nobody answered.
+///
+/// The request cancelled itself after the answer window, so this is the end of
+/// the road for that booking, and the two things a Thekedar wants next: try the
+/// same worker again, or look for somebody else.
+class _RequestExpired extends StatelessWidget {
+  const _RequestExpired({
+    required this.name,
+    required this.labourId,
+    required this.window,
+  });
+
+  final String name;
+  final int labourId;
+  final int window;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+
+    return ColoredBox(
+      color: AppColors.surfaceAlt,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(Gap.x4l),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.timer_off_outlined,
+                size: 40,
+                color: AppColors.danger,
+              ),
+              Gap.v20,
+              Text(
+                s.requestExpiredTitle,
+                style: AppType.h3,
+                textAlign: TextAlign.center,
+              ),
+              Gap.vXs,
+              Text(
+                s.requestExpiredBody(name, window),
+                style: AppType.bodyMuted,
+                textAlign: TextAlign.center,
+              ),
+              Gap.v20,
+              KwButton(
+                label: s.resendRequest,
+                icon: Icons.refresh_rounded,
+                // Back to the worker's own page, where the booking sheet is: the
+                // old booking is closed, so this is a new one.
+                onPressed: () => Navigator.of(
+                  context,
+                ).pushReplacementNamed(Routes.labourDetail, arguments: labourId),
+              ),
+              Gap.vMd,
+              KwButton(
+                label: s.findAnotherWorker,
+                icon: Icons.search_rounded,
+                variant: KwButtonVariant.outline,
+                onPressed: () => Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil(Routes.home, (_) => false),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

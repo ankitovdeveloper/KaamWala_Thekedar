@@ -769,7 +769,14 @@ class Booking {
     this.completionRemark,
     this.crewId,
     this.crewSize,
+    this.requestExpiresAt,
+    this.requestTtlSeconds = defaultRequestTtlSeconds,
+    this.cancellationReasonCode,
   });
+
+  /// How long a worker has to answer a request, until the server says otherwise
+  /// (`Booking::REQUEST_TTL_SECONDS`).
+  static const defaultRequestTtlSeconds = 20;
 
   final int id;
   final LabourRef labour;
@@ -780,6 +787,18 @@ class Booking {
   /// say so and lead to the crew's status. Null for an ordinary booking.
   final int? crewId;
   final int? crewSize;
+
+  /// When an unanswered request cancels itself, or null once it has been
+  /// answered. Worked out on arrival from the server's `request_seconds_left`
+  /// rather than from a timestamp, so a phone whose clock is wrong still counts
+  /// down the right number of seconds.
+  final DateTime? requestExpiresAt;
+
+  /// The full answer window, for drawing progress.
+  final int requestTtlSeconds;
+
+  /// `expired` when the request withdrew itself because nobody answered.
+  final String? cancellationReasonCode;
 
   /// `agreed_price` once negotiated, else `offered_amount` — matching
   /// `Booking::finalAmount()`.
@@ -871,13 +890,39 @@ class Booking {
       completionRemark: json.strOrNull('completion_remark'),
       crewId: json['crew_id'] == null ? null : json.intVal('crew_id'),
       crewSize: json.mapOrNull('crew')?.intVal('size'),
+      requestExpiresAt: _deadlineFrom(json['request_seconds_left']),
+      requestTtlSeconds: json['request_ttl_seconds'] == null
+          ? defaultRequestTtlSeconds
+          : json.intVal('request_ttl_seconds'),
+      cancellationReasonCode: json.strOrNull('cancellation_reason_code'),
     );
+  }
+
+  /// "N seconds left" as of now, as a point in time. Null when the server sent
+  /// nothing (an answered booking, or an older backend).
+  static DateTime? _deadlineFrom(Object? secondsLeft) {
+    final n = switch (secondsLeft) {
+      final num n => n.round(),
+      final String s => int.tryParse(s),
+      _ => null,
+    };
+    return n == null ? null : DateTime.now().add(Duration(seconds: n));
   }
 
   static String? _clockTime(String? raw) {
     if (raw == null || raw.isEmpty) return null;
     return raw.length >= 5 ? raw.substring(0, 5) : raw;
   }
+
+  /// True when the request withdrew itself because the worker never answered.
+  bool get wasExpired =>
+      status == BookingStatus.cancelled && cancellationReasonCode == 'expired';
+
+  /// True while a request is out and its countdown has not run out.
+  bool get isAwaitingAnswer =>
+      status == BookingStatus.pending &&
+      requestExpiresAt != null &&
+      requestExpiresAt!.isAfter(DateTime.now());
 
   bool get isActive =>
       status == BookingStatus.accepted || status == BookingStatus.pending;
@@ -961,6 +1006,7 @@ class Booking {
     String? paymentMode,
     String? completionResponse,
     String? completionRemark,
+    String? cancellationReasonCode,
   }) => Booking(
     id: id,
     labour: labour,
@@ -987,6 +1033,10 @@ class Booking {
     completionRemark: completionRemark ?? this.completionRemark,
     crewId: crewId,
     crewSize: crewSize,
+    requestExpiresAt: requestExpiresAt,
+    requestTtlSeconds: requestTtlSeconds,
+    cancellationReasonCode:
+        cancellationReasonCode ?? this.cancellationReasonCode,
   );
 }
 
@@ -1287,7 +1337,11 @@ enum BookingOutcomeKind {
   terminated,
 
   /// The worker turned it down.
-  declined;
+  declined,
+
+  /// The worker never answered inside the window and the request withdrew
+  /// itself — nobody cancelled it, and nobody refused it.
+  expired;
 
   static BookingOutcomeKind parse(String? v) => switch (v) {
     'running' => running,
@@ -1296,6 +1350,7 @@ enum BookingOutcomeKind {
     'cancelled' => cancelled,
     'terminated' => terminated,
     'declined' => declined,
+    'expired' => expired,
     _ => waiting,
   };
 
@@ -1304,7 +1359,8 @@ enum BookingOutcomeKind {
       this == disputed ||
       this == cancelled ||
       this == terminated ||
-      this == declined;
+      this == declined ||
+      this == expired;
 }
 
 /// What closed the booking, and what either side said about it.
@@ -1671,7 +1727,20 @@ class TrackingUpdate {
     this.termination,
     this.declined = false,
     this.declinedAt,
+    this.requestExpiresAt,
+    this.requestTtlSeconds = Booking.defaultRequestTtlSeconds,
+    this.expired = false,
   });
+
+  /// When the unanswered request cancels itself — the countdown on the waiting
+  /// screen. Null once the worker has answered.
+  final DateTime? requestExpiresAt;
+  final int requestTtlSeconds;
+
+  /// True once the worker let the window run out and the request withdrew
+  /// itself. The third way a request can end without a job: refused, expired,
+  /// or stopped part-way.
+  final bool expired;
 
   /// False while the request is still with the worker.
   final bool accepted;
@@ -1750,11 +1819,17 @@ class TrackingUpdate {
     },
     declined: json.strOrNull('status') == 'declined',
     declinedAt: json.date('declined_at'),
+    requestExpiresAt: Booking._deadlineFrom(json['request_seconds_left']),
+    requestTtlSeconds: json['request_ttl_seconds'] == null
+        ? Booking.defaultRequestTtlSeconds
+        : json.intVal('request_ttl_seconds'),
+    expired: json.flag('expired'),
   );
 
   /// "8 min door" / "Kaam shuru ho gaya" — the tracking card's headline.
   String etaLabelIn(AppStrings s) {
     if (declined) return s.requestRejected;
+    if (expired) return s.requestExpiredTitle;
     if (!accepted) return s.waitingForAccept;
     if (stage == JobStage.working) return s.workStarted;
     if (stage == JobStage.completed) return s.workFinished;

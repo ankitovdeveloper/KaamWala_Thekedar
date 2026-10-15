@@ -813,6 +813,19 @@ class AppStrings {
       'abhi kaam par nahi pahunche unki booking cancel ho jayegi.';
   String get crewDone => 'Theek hai';
   String crewBadge(int n) => 'Crew · $n log';
+
+  // ── Request answer window (an unanswered request cancels itself) ──────────
+
+  String get requestExpiredTitle => 'Kaam wale ne jawab nahi diya';
+  String requestExpiredBody(String name, int seconds) =>
+      '$name ne $seconds second me request accept nahi ki, isliye ye apne '
+      'aap cancel ho gayi.';
+  String get resendRequest => 'Dobara bhejein';
+  String requestAnswerHint(int seconds) =>
+      '$seconds second me jawab na aaya to request apne aap cancel ho jayegi.';
+  String get requestCheckingAnswer => 'Jawab dekh rahe hain…';
+  String requestCountdownLine(String time) =>
+      '$time me jawab na aaya to cancel';
 }
 
 // ── Hindi ───────────────────────────────────────────────────────────────────
@@ -2013,6 +2026,25 @@ class _Hindi extends AppStrings {
   String get crewDone => 'ठीक है';
   @override
   String crewBadge(int n) => 'क्रू · $n लोग';
+
+  // ── Request answer window ─────────────────────────────────────────────────
+
+  @override
+  String get requestExpiredTitle => 'कारीगर ने जवाब नहीं दिया';
+  @override
+  String requestExpiredBody(String name, int seconds) =>
+      '$name ने $seconds सेकंड में रिक्वेस्ट एक्सेप्ट नहीं की, इसलिए ये अपने '
+      'आप कैंसिल हो गई।';
+  @override
+  String get resendRequest => 'दोबारा भेजें';
+  @override
+  String requestAnswerHint(int seconds) =>
+      '$seconds सेकंड में जवाब न आया तो रिक्वेस्ट अपने आप कैंसिल हो जाएगी।';
+  @override
+  String get requestCheckingAnswer => 'जवाब देख रहे हैं…';
+  @override
+  String requestCountdownLine(String time) =>
+      '$time में जवाब न आया तो कैंसिल';
 }
 
 // ── English ─────────────────────────────────────────────────────────────────
@@ -3181,6 +3213,25 @@ class _English extends AppStrings {
   String get crewDone => 'Done';
   @override
   String crewBadge(int n) => 'Crew · $n workers';
+
+  // ── Request answer window ─────────────────────────────────────────────────
+
+  @override
+  String get requestExpiredTitle => "The worker didn't answer";
+  @override
+  String requestExpiredBody(String name, int seconds) =>
+      "$name didn't accept within $seconds seconds, so the request "
+      'cancelled itself.';
+  @override
+  String get resendRequest => 'Send again';
+  @override
+  String requestAnswerHint(int seconds) =>
+      'If there is no answer in $seconds seconds the request cancels itself.';
+  @override
+  String get requestCheckingAnswer => 'Checking for an answer…';
+  @override
+  String requestCountdownLine(String time) =>
+      'Cancels in $time without an answer';
 }
 
 // ── Bhojpuri ────────────────────────────────────────────────────────────────

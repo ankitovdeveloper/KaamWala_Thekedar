@@ -458,6 +458,9 @@ class _BookingsScreenState extends State<BookingsScreen>
               onReview: () => _review(booking),
               onComplete: () => _complete(booking),
               onPaymentDone: () => _pay(booking),
+              onRequestExpired: () {
+                if (mounted) _bookings.load(silent: true);
+              },
               onCrew: booking.crewId == null
                   ? null
                   : () => Navigator.of(
