@@ -34,9 +34,9 @@ abstract final class ApiConfig {
   /// Search needs coordinates. Used for `GET /thekedar/labour?lat=&lng=` only
   /// until the user picks their own point in the location screen, which stores
   /// it on `users.latitude/longitude`.
-  static const fallbackLat = 28.4595; // Gurgaon
-  static const fallbackLng = 77.0266;
-  static const defaultRadiusKm = 25;
+  static const fallbackLat = 26.8485965; // Gurgaon
+  static const fallbackLng = 80.7777017; // Lucknow
+  static const defaultRadiusKm = 20;
 
   /// Google Maps JS / SDK key, supplied at build time so it never lands in
   /// source control:
@@ -56,7 +56,7 @@ abstract final class ApiConfig {
   /// How often `GET /thekedar/bookings/{id}/track` is polled while a job is
   /// live. Between polls the marker animates to the new position, so this is
   /// a data-freshness knob, not a smoothness one.
-  static const trackingPollInterval = Duration(seconds: 4);
+  static const trackingPollInterval = Duration(seconds: 2);
 
   /// How often a screen that is *showing* a live booking re-reads it, so a
   /// stage the worker moved — "Raaste mein" above all — lands without anyone
@@ -66,4 +66,11 @@ abstract final class ApiConfig {
   /// row and a timeline, not a dot sliding across a map, and a stage changes a
   /// handful of times a day rather than every second.
   static const stagePollInterval = Duration(seconds: 5);
+
+  /// How often the Thekedar's labour maps (the search map and the "all
+  /// labours" map) re-read who is out there, so a worker who switches their
+  /// duty on shows up — and one who switches it off drops away — without
+  /// anybody pulling to refresh. Raise it to go easier on the server, lower it
+  /// for fresher pins.
+  static const labourMapPollInterval = Duration(seconds: 5);
 }

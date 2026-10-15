@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/animations/pressable.dart';
+import '../../core/async/live_poll.dart';
 import '../../core/async/loadable.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/router/routes.dart';
@@ -43,7 +44,8 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends State<SearchScreen>
+    with WidgetsBindingObserver {
   final _query = TextEditingController();
   final _sheetController = DraggableScrollableController();
 
@@ -60,9 +62,22 @@ class _SearchScreenState extends State<SearchScreen> {
   late final Session _session = SessionScope.read(context);
   GeoPoint? _fetchedFrom;
 
+  /// Bumped by every [_fetch], so a poll can tell that a search the Thekedar
+  /// started (a new filter, a new name) went out while it was in flight.
+  int _fetchSerial = 0;
+
+  /// Labour switch their duty on and off from their own phone, and none of it
+  /// reaches this map on its own. Runs only while this tab is on screen and
+  /// the app is in the foreground.
+  late final LivePoll _live = LivePoll(
+    onTick: _pollLabours,
+    interval: ApiConfig.labourMapPollInterval,
+  );
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _session.addListener(_onSessionChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -95,7 +110,37 @@ class _SearchScreenState extends State<SearchScreen> {
     await LocationPickerScreen.push(context);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The home shell freezes tabs that are not showing with a disabled
+    // TickerMode — a hidden map has nobody to show a new pin to.
+    _live.sync(wanted: TickerMode.valuesOf(context).enabled);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _live.resume();
+      unawaited(_pollLabours());
+    } else {
+      _live.pause();
+    }
+  }
+
+  /// Re-runs the current search in the background. Goes around [Loadable] on
+  /// purpose: a dropped poll must not swap a list that is fine for an error,
+  /// and a stale answer must not land on top of a search started meanwhile.
+  Future<void> _pollLabours() async {
+    if (!_results.hasValue || _results.isLoading) return;
+    final serial = _fetchSerial;
+    final result = await _fetch();
+    if (!mounted || _fetchSerial != serial + 1 || _results.isLoading) return;
+    _results.setValue(result);
+  }
+
   Future<_SearchResult> _fetch() async {
+    _fetchSerial++;
     final origin = _origin;
     _fetchedFrom = origin;
 
@@ -154,6 +199,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _live.dispose();
     _debounce?.cancel();
     _session.removeListener(_onSessionChanged);
     _query.dispose();

@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/animations/entrance.dart';
 import '../../core/animations/pressable.dart';
+import '../../core/async/live_poll.dart';
 import '../../core/async/loadable.dart';
 import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
@@ -22,25 +23,63 @@ class LaboursMapScreen extends StatefulWidget {
   State<LaboursMapScreen> createState() => _LaboursMapScreenState();
 }
 
-class _LaboursMapScreenState extends State<LaboursMapScreen> {
+class _LaboursMapScreenState extends State<LaboursMapScreen>
+    with WidgetsBindingObserver {
   late final Loadable<List<Labour>> _labours = Loadable(
     () => context.repo.allLaboursForSearch(),
   );
 
+  /// Picks up labour who switch their duty on (or off) while the map is open.
+  late final LivePoll _live = LivePoll(
+    onTick: () => _labours.load(silent: true),
+    interval: ApiConfig.labourMapPollInterval,
+  );
+
   GoogleMapController? _mapController;
+
+  /// Who the camera was last framed around. A refresh that brings back the
+  /// same people leaves the camera wherever the Thekedar panned it.
+  Set<int>? _framedIds;
 
   @override
   void initState() {
     super.initState();
-    _labours.addListener(_fitMarkers);
+    WidgetsBinding.instance.addObserver(this);
+    _labours.addListener(_onLabours);
     _labours.load();
+    _live.sync(wanted: true);
   }
 
   @override
   void dispose() {
-    _labours.removeListener(_fitMarkers);
+    WidgetsBinding.instance.removeObserver(this);
+    _live.dispose();
+    _labours.removeListener(_onLabours);
     _labours.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _live.resume();
+      _labours.load(silent: true);
+    } else {
+      _live.pause();
+    }
+  }
+
+  void _onLabours() {
+    final labours = _labours.value;
+    if (labours == null || _labours.isLoading) return;
+    final ids = {for (final l in labours) l.id};
+    final framed = _framedIds;
+    if (framed != null &&
+        framed.length == ids.length &&
+        framed.containsAll(ids)) {
+      return;
+    }
+    _fitMarkers();
   }
 
   GeoPoint get _origin {
@@ -60,6 +99,7 @@ class _LaboursMapScreenState extends State<LaboursMapScreen> {
     final controller = _mapController;
     final labours = _labours.value;
     if (controller == null || labours == null || labours.isEmpty) return;
+    _framedIds = {for (final l in labours) l.id};
 
     final positions = labours
         .map((l) => l.latLng)

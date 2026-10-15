@@ -56,12 +56,21 @@ class _SearchMapState extends State<SearchMap> {
     if (oldWidget.labours != widget.labours) {
       _loadCustomIcons();
     }
-    // Re-frame when the area being searched changes, or when labours data updates.
+    // Re-frame when the area being searched changes, or when somebody joins or
+    // leaves the map. A background refresh that brings back the same people
+    // must not yank the camera away from wherever the Thekedar panned to.
     if (oldWidget.radiusKm != widget.radiusKm ||
         oldWidget.origin != widget.origin ||
-        oldWidget.labours != widget.labours) {
+        !_sameLabours(oldWidget.labours, widget.labours)) {
       _fitRadius();
     }
+  }
+
+  static bool _sameLabours(List<Labour> a, List<Labour> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    final ids = {for (final l in a) l.id};
+    return b.every((l) => ids.contains(l.id));
   }
 
   @override
