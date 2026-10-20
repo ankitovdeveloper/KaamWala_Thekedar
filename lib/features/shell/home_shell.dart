@@ -58,13 +58,43 @@ class HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     unawaited(LocationPrompt.maybeShow(context));
   }
 
+  /// Tabs the Thekedar came from, oldest first. The system back button walks this
+  /// back before it lets the app close, so back means "where I was" not "quit".
+  final List<int> _tabHistory = <int>[];
+
   void goToTab(int index) {
     if (index == _index) return;
-    setState(() => _index = index);
+    _tabHistory.add(_index);
+    _show(index);
+  }
+
+  /// Switches the visible tab without recording it in [_tabHistory]; used by a
+  /// normal selection and by a back press alike.
+  void _show(int index) => setState(() => _index = index);
+
+  /// The system back press once no pushed route is left above the shell.
+  void _onBack() {
+    if (_tabHistory.isNotEmpty) {
+      _show(_tabHistory.removeLast());
+    } else if (_index != 0) {
+      _show(0);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Only the first tab with nothing in history lets the back press close the
+    // app; everywhere else it is handled by [_onBack] first.
+    return PopScope(
+      canPop: _index == 0 && _tabHistory.isEmpty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onBack();
+      },
+      child: _buildShell(context),
+    );
+  }
+
+  Widget _buildShell(BuildContext context) {
     final pages = <Widget>[
       const SearchScreen(),
       const BookingsScreen(),

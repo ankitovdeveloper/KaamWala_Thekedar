@@ -108,7 +108,13 @@ class _LabourDetailScreenState extends State<LabourDetailScreen> {
 
     // Straight into tracking: the request is now with the worker, and this is
     // the screen that shows their answer arriving and then where they are.
-    Navigator.of(context).pushNamed(Routes.tracking, arguments: booking);
+    // Replacing this page rather than stacking on it means the worker's detail
+    // is not left open underneath once the answer comes in (accept, reject or
+    // expiry) — the tracking screen is the only one that remains.
+    Navigator.of(context).pushReplacementNamed(
+      Routes.tracking,
+      arguments: booking,
+    );
   }
 
   Future<void> _toggleSaved(Labour labour) async {
