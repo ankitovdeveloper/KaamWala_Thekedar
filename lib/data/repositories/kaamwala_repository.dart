@@ -299,4 +299,11 @@ abstract interface class KaamWalaRepository {
   /// Throws [ApiException]: 422 when it was already claimed or a field is
   /// refused, 403 when the reward is not this user's.
   Future<void> claimReward(int userRewardId, ClaimDetails details);
+
+  /// `GET /rewards/referral/validate?code=` — public, so the Register screen
+  /// can check a friend's Share & Earn code before the account exists.
+  /// Returns the referrer's name. Throws [ApiException] with a 422
+  /// (`isValidation`) when no one owns [code]; any other failure means the
+  /// check could not be made, not that the code is wrong.
+  Future<String> validateReferralCode(String code);
 }

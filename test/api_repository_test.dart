@@ -1014,4 +1014,71 @@ void main() {
       );
     });
   });
+
+  group('Referral code', () {
+    const draft = SignupDraft(
+      name: 'Amit Khurana',
+      phone: '9812345678',
+      address: 'Sector 45, Gurgaon',
+      referralCode: 'KW7X2PQR',
+    );
+
+    test('register and verify-otp both carry referral_code', () async {
+      final (:repo, :client) = _build(
+        (_) => (
+          status: 200,
+          body: _ok({'phone': '9812345678', 'token': 't', 'user': {'id': 1}}),
+        ),
+      );
+
+      await repo.register(draft: draft);
+      expect(client.lastRequest!.url.path, '/api/v1/auth/register');
+      expect(jsonDecode(client.lastBody)['referral_code'], 'KW7X2PQR');
+
+      await repo.verifyOtp(phone: draft.phone, otp: '123456', draft: draft);
+      expect(client.lastRequest!.url.path, '/api/v1/auth/verify-otp');
+      final sent = jsonDecode(client.lastBody) as Map<String, dynamic>;
+      expect(sent['purpose'], 'register');
+      expect(sent['referral_code'], 'KW7X2PQR');
+    });
+
+    test('validate is a GET with the code and returns the referrer', () async {
+      final (:repo, :client) = _build(
+        (_) => (
+          status: 200,
+          body: _ok({'valid': true, 'referrer_name': 'Ramesh Yadav'}),
+        ),
+      );
+
+      expect(await repo.validateReferralCode('KW7X2PQR'), 'Ramesh Yadav');
+      expect(
+        client.lastRequest!.url.path,
+        '/api/v1/rewards/referral/validate',
+      );
+      expect(client.lastRequest!.url.queryParameters['code'], 'KW7X2PQR');
+      expect(client.lastRequest!.method, 'GET');
+    });
+
+    test('validate maps an unknown code to a 422', () async {
+      final (:repo, client: _) = _build(
+        (_) => (
+          status: 422,
+          body: {
+            'success': false,
+            'message': 'Referral code galat hai.',
+            'errors': {
+              'code': ['Invalid referral code.'],
+            },
+          },
+        ),
+      );
+
+      await expectLater(
+        repo.validateReferralCode('KWNOPE99'),
+        throwsA(
+          isA<ApiException>().having((e) => e.isValidation, 'isValidation', true),
+        ),
+      );
+    });
+  });
 }

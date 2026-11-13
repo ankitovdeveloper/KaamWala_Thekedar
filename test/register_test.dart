@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:kaamwala_thekedar/core/referral/install_referrer.dart';
 import 'package:kaamwala_thekedar/data/api/api_exception.dart';
 import 'package:kaamwala_thekedar/data/models/models.dart';
 import 'package:kaamwala_thekedar/data/repositories/mock_repository.dart';
@@ -111,7 +112,9 @@ Future<void> tapSubmit(WidgetTester tester) async {
 
 void main() {
   group('Register form', () {
-    testWidgets('asks for exactly the four sign-up details', (tester) async {
+    testWidgets('asks for the four sign-up details plus a referral code', (
+      tester,
+    ) async {
       await tester.pumpWidget(host(const RegisterScreen()));
       await tester.pumpAndSettle();
 
@@ -120,7 +123,8 @@ void main() {
       expect(find.text('Address'), findsOneWidget);
       // Optional, and the label has to say so — the server does not require it.
       expect(find.text('Email (optional)'), findsOneWidget);
-      expect(find.byType(TextField), findsNWidgets(4));
+      expect(find.text('Referral code (optional)'), findsOneWidget);
+      expect(find.byType(TextField), findsNWidgets(5));
     });
 
     testWidgets('an empty form flags every required field at once', (
@@ -239,6 +243,77 @@ void main() {
         find.text('Ye number pehle se registered hai. Login karein.'),
         findsOneWidget,
       );
+    });
+  });
+
+  group('Referral code', () {
+    /// Types into the referral field (the fifth, under email) and waits out
+    /// the debounce so the server check has answered.
+    Future<void> enterReferral(WidgetTester tester, String code) async {
+      await tester.enterText(find.byType(TextField).at(4), code);
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+    }
+
+    TextField referralField(WidgetTester tester) =>
+        tester.widget<TextField>(find.byType(TextField).at(4));
+
+    testWidgets('a known code names the friend and rides along to register', (
+      tester,
+    ) async {
+      final repo = _RecordingRepository();
+      await tester.pumpWidget(host(const RegisterScreen(), repository: repo));
+      await tester.pumpAndSettle();
+
+      // Typed in lower case: the field upper-cases as it goes.
+      await enterReferral(tester, 'kwtest22');
+      expect(referralField(tester).controller!.text, 'KWTEST22');
+      expect(find.text('Ramesh Yadav ne aapko bulaya hai'), findsOneWidget);
+
+      await fillForm(tester);
+      await tapSubmit(tester);
+
+      expect(repo.registered, isNotNull);
+      expect(repo.registered!.referralCode, 'KWTEST22');
+      expect(repo.registered!.toJson()['referral_code'], 'KWTEST22');
+    });
+
+    testWidgets('an unknown code is flagged and blocks the submit', (
+      tester,
+    ) async {
+      final repo = _RecordingRepository();
+      await tester.pumpWidget(host(const RegisterScreen(), repository: repo));
+      await tester.pumpAndSettle();
+
+      await enterReferral(tester, 'KWNOPE99');
+      expect(find.text('Ye referral code sahi nahi hai'), findsOneWidget);
+
+      await fillForm(tester);
+      await tapSubmit(tester);
+      expect(repo.registered, isNull);
+
+      // Clearing it lets the sign-up through without one.
+      await enterReferral(tester, '');
+      expect(find.text('Ye referral code sahi nahi hai'), findsNothing);
+      await tapSubmit(tester);
+      expect(repo.registered, isNotNull);
+      expect(repo.registered!.referralCode, isNull);
+    });
+
+    testWidgets('a code from the Play Store install referrer is pre-filled', (
+      tester,
+    ) async {
+      InstallReferrer.debugRawReferrer = () async =>
+          'utm_source=referral&ref=kwtest22';
+      addTearDown(() => InstallReferrer.debugRawReferrer = null);
+
+      await tester.pumpWidget(
+        host(const RegisterScreen(), repository: _RecordingRepository()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(referralField(tester).controller!.text, 'KWTEST22');
+      expect(find.text('Ramesh Yadav ne aapko bulaya hai'), findsOneWidget);
     });
   });
 

@@ -97,4 +97,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Play Store install referrer — carries a friend's referral code from the
+    // shared link into the Register screen (MainActivity.readInstallReferrer).
+    implementation("com.android.installreferrer:installreferrer:2.2")
 }

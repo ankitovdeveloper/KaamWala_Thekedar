@@ -609,6 +609,14 @@ class ApiRepository implements KaamWalaRepository {
     await _api.post('rewards/$userRewardId/claim', body: details.toJson());
   }
 
+  @override
+  Future<String> validateReferralCode(String code) async {
+    final data = _obj(
+      await _api.get('rewards/referral/validate', query: {'code': code}),
+    );
+    return data.str('referrer_name');
+  }
+
   static String _ymd(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-'
       '${d.month.toString().padLeft(2, '0')}-'

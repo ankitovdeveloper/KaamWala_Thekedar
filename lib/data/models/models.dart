@@ -2181,6 +2181,7 @@ class SignupDraft {
     required this.phone,
     required this.address,
     this.email = '',
+    this.referralCode,
   });
 
   final String name;
@@ -2193,12 +2194,19 @@ class SignupDraft {
   /// Optional; empty means "not given" and is omitted from the request.
   final String email;
 
+  /// A friend's Share & Earn code, typed or filled in from the Play Store
+  /// install referrer. `/auth/register` checks it and `/auth/verify-otp`
+  /// credits the friend — only ever for a brand-new account.
+  final String? referralCode;
+
   /// The sign-up fields as the API names them, with the blanks left out so a
   /// `nullable` validator sees an absent key rather than an empty string.
   Map<String, Object?> toJson() => {
     'name': name,
     if (address.isNotEmpty) 'address': address,
     if (email.isNotEmpty) 'email': email,
+    if (referralCode case final code? when code.isNotEmpty)
+      'referral_code': code,
   };
 }
 

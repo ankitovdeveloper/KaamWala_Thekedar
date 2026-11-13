@@ -1093,6 +1093,25 @@ class MockRepository implements KaamWalaRepository {
     }
     _toolKitClaimed = true;
   }
+
+  /// The one code the mock knows, so the Register screen's "invited by" line
+  /// can be demoed offline. Everything else gets the server's 422.
+  static const mockReferralCode = 'KWTEST22';
+
+  @override
+  Future<String> validateReferralCode(String code) async {
+    await _delayed(null);
+    if (code.trim().toUpperCase() != mockReferralCode) {
+      throw const ApiException(
+        'Referral code galat hai.',
+        statusCode: 422,
+        fieldErrors: {
+          'code': ['Invalid referral code.'],
+        },
+      );
+    }
+    return 'Ramesh Yadav';
+  }
 }
 
 /// One worker travelling to one job, played out against the wall clock.

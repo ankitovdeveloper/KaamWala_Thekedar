@@ -110,6 +110,13 @@ class AppStrings {
   String get loginInstead => 'Login karein';
   String get phoneTaken => 'Ye number pehle se registered hai. Login karein.';
 
+  // Share & Earn — a friend's code on the Register screen.
+  String get registerReferralLabel => 'Referral code (optional)';
+  String get registerReferralHint => 'jaise KW7X2PQR';
+  String get registerReferralChecking => 'Code check ho raha hai…';
+  String registerReferralValid(String name) => '$name ne aapko bulaya hai';
+  String get registerReferralInvalid => 'Ye referral code sahi nahi hai';
+
   // ── OTP ───────────────────────────────────────────────────────────────────
 
   String get otpTitle => 'OTP Verify karein';
@@ -936,6 +943,16 @@ class _Hindi extends AppStrings {
   String get loginInstead => 'लॉगिन करें';
   @override
   String get phoneTaken => 'यह नंबर पहले से रजिस्टर्ड है। लॉगिन करें।';
+  @override
+  String get registerReferralLabel => 'रेफ़रल कोड (ज़रूरी नहीं)';
+  @override
+  String get registerReferralHint => 'जैसे KW7X2PQR';
+  @override
+  String get registerReferralChecking => 'कोड जाँच रहे हैं…';
+  @override
+  String registerReferralValid(String name) => '$name ने आपको बुलाया है';
+  @override
+  String get registerReferralInvalid => 'यह रेफ़रल कोड सही नहीं है';
 
   @override
   String get otpTitle => 'OTP वेरिफ़ाई करें';
@@ -2156,6 +2173,16 @@ class _English extends AppStrings {
   @override
   String get phoneTaken =>
       'This number is already registered. Please log in instead.';
+  @override
+  String get registerReferralLabel => 'Referral code (optional)';
+  @override
+  String get registerReferralHint => 'e.g. KW7X2PQR';
+  @override
+  String get registerReferralChecking => 'Checking code…';
+  @override
+  String registerReferralValid(String name) => 'Invited by $name';
+  @override
+  String get registerReferralInvalid => 'This referral code is not valid';
 
   @override
   String get otpTitle => 'Verify OTP';
@@ -3319,6 +3346,16 @@ class _Bhojpuri extends _Hindi {
   String get loginInstead => 'लॉगिन करीं';
   @override
   String get phoneTaken => 'ई नंबर पहिले से रजिस्टर बा। लॉगिन करीं।';
+  @override
+  String get registerReferralLabel => 'रेफ़रल कोड (जरूरी नइखे)';
+  @override
+  String get registerReferralHint => 'जइसे KW7X2PQR';
+  @override
+  String get registerReferralChecking => 'कोड जाँचल जात बा…';
+  @override
+  String registerReferralValid(String name) => '$name रउआ के बोलवले बाड़ें';
+  @override
+  String get registerReferralInvalid => 'ई रेफ़रल कोड सही नइखे';
 
   @override
   String get otpTitle => 'OTP वेरिफ़ाई करीं';

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/animations/entrance.dart';
 import '../../core/animations/pressable.dart';
+import '../../core/referral/install_referrer.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
@@ -22,7 +25,9 @@ import 'otp_screen.dart';
 /// Thekedar sign-up, backed by `POST /v1/auth/register`.
 ///
 /// Collects the four things the account needs and nothing else: name, mobile,
-/// address, and an optional email. It does not create anything — the server
+/// address, and an optional email — plus an optional friend's referral code,
+/// pre-filled from the Play Store install referrer when the app was installed
+/// through a shared link. It does not create anything — the server
 /// only checks the number is free and sends a sign-up OTP. The account is
 /// created by `verify-otp`, which is why the [SignupDraft] rides along to the
 /// OTP screen instead of being thrown away here.
@@ -38,6 +43,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phone = TextEditingController();
   final _address = TextEditingController();
   final _email = TextEditingController();
+  final _referral = TextEditingController();
 
   bool _busy = false;
   String? _nameError;
@@ -56,10 +62,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
   /// app is showing its bundled copy — see [LegalDocument.acceptedVersion].
   String? _termsVersion;
 
+  /// Where the friend's code stands with the server. Only [_Referral.invalid]
+  /// blocks a submit; anything else goes through and `/auth/register`, which
+  /// checks the code again, has the last word.
+  _Referral _referralState = _Referral.idle;
+  String? _referrerName;
+  Timer? _referralDebounce;
+
+  /// Bumped on every edit, so an answer for a code that has since been
+  /// changed is dropped instead of painting the wrong verdict.
+  int _referralSeq = 0;
+
   @override
   void initState() {
     super.initState();
     unawaited(_loadTermsVersion());
+    unawaited(_prefillReferral());
   }
 
   Future<void> _loadTermsVersion() async {
@@ -67,16 +85,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (mounted) setState(() => _termsVersion = doc.acceptedVersion);
   }
 
+  /// Installed from a friend's link? The Play Store remembers the code; put it
+  /// in the field so the friend is credited without anyone typing it.
+  Future<void> _prefillReferral() async {
+    final code = await InstallReferrer.referralCode();
+    if (!mounted || code == null || _referral.text.isNotEmpty) return;
+    _referral.text = code;
+    unawaited(_checkReferral(code));
+  }
+
   @override
   void dispose() {
+    _referralDebounce?.cancel();
     _name.dispose();
     _phone.dispose();
     _address.dispose();
     _email.dispose();
+    _referral.dispose();
     super.dispose();
   }
 
   String get _digits => _phone.text.replaceAll(RegExp(r'\D'), '');
+
+  String get _referralCode => InstallReferrer.normalize(_referral.text);
+
+  /// Waits for typing to pause, then asks the server whose code it is. Too
+  /// short to be a code clears the verdict rather than calling it wrong.
+  void _onReferralChanged(String _) {
+    _referralDebounce?.cancel();
+    _referralSeq++;
+    final code = _referralCode;
+    setState(() {
+      _referralState = _Referral.idle;
+      _referrerName = null;
+    });
+    if (!InstallReferrer.isCode(code)) return;
+    _referralDebounce = Timer(
+      const Duration(milliseconds: 450),
+      () => unawaited(_checkReferral(code)),
+    );
+  }
+
+  Future<void> _checkReferral(String code) async {
+    final seq = ++_referralSeq;
+    setState(() => _referralState = _Referral.checking);
+    try {
+      final name = await context.repo.validateReferralCode(code);
+      if (!mounted || seq != _referralSeq) return;
+      setState(() {
+        _referralState = _Referral.valid;
+        _referrerName = name;
+      });
+    } on Object catch (e) {
+      if (!mounted || seq != _referralSeq) return;
+      // Only a 422 means "no such code". No signal is not a verdict — the
+      // server checks again on submit.
+      final invalid = e is ApiException && e.isValidation;
+      setState(
+        () => _referralState = invalid ? _Referral.invalid : _Referral.idle,
+      );
+    }
+  }
 
   /// Everything the server would reject, checked here first so a bad form costs
   /// no round trip. Every failing field is flagged in one pass — flagging only
@@ -95,6 +164,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ? s.emailInvalid
         : null;
     final termsError = _agreed ? null : s.termsRequired;
+    // Optional too: blank is fine, a known-bad or malformed code is not.
+    final referral = _referralCode;
+    final referralOk =
+        referral.isEmpty ||
+        (InstallReferrer.isCode(referral) &&
+            _referralState != _Referral.invalid);
 
     setState(() {
       _nameError = nameError;
@@ -102,6 +177,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _addressError = addressError;
       _emailError = emailError;
       _termsError = termsError;
+      if (!referralOk) _referralState = _Referral.invalid;
     });
 
     final ok =
@@ -109,7 +185,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         phoneError == null &&
         addressError == null &&
         emailError == null &&
-        termsError == null;
+        termsError == null &&
+        referralOk;
     if (!ok) {
       setState(() => _shake++);
       HapticFeedback.heavyImpact();
@@ -133,6 +210,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       phone: _digits,
       address: _address.text.trim(),
       email: _email.text.trim(),
+      referralCode: _referralCode.isEmpty ? null : _referralCode,
     );
 
     try {
@@ -170,13 +248,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
             : null;
         _addressError = api?.fieldError('address');
         _emailError = api?.fieldError('email');
+        if (api?.fieldError('referral_code') != null) {
+          _referralState = _Referral.invalid;
+        }
       });
 
       final flagged =
           _nameError != null ||
           _phoneError != null ||
           _addressError != null ||
-          _emailError != null;
+          _emailError != null ||
+          _referralState == _Referral.invalid;
       if (!flagged) _toast(describeError(context, e));
     }
   }
@@ -298,14 +380,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     hintText: s.emailHint,
                                     errorText: _emailError,
                                     keyboardType: TextInputType.emailAddress,
-                                    textInputAction: TextInputAction.done,
-                                    onSubmitted: (_) => _submit(),
+                                    textInputAction: TextInputAction.next,
                                     onChanged: (_) => _clear(() {
                                       _emailError = null;
                                     }, _emailError),
                                   ),
                                 ],
                               ),
+                            ),
+                            Gap.vLg,
+                            FadeSlideIn(
+                              delay: const Duration(milliseconds: 395),
+                              child: _referralField(),
                             ),
                           ],
                         ),
@@ -360,6 +446,77 @@ class _RegisterScreenState extends State<RegisterScreen> {
   /// there was no error to clear.
   void _clear(VoidCallback clear, String? current) {
     if (current != null) setState(clear);
+  }
+
+  /// The friend's Share & Earn code, with the server's verdict underneath:
+  /// whose code it is, or that it is not one.
+  Widget _referralField() {
+    final s = context.s;
+    final note = switch (_referralState) {
+      _Referral.checking => Text(
+        s.registerReferralChecking,
+        style: AppType.micro.copyWith(color: AppColors.muted),
+      ),
+      _Referral.valid => Row(
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            size: 14,
+            color: AppColors.successDark,
+          ),
+          Gap.hXs,
+          Flexible(
+            child: Text(
+              s.registerReferralValid(_referrerName ?? ''),
+              style: AppType.micro.copyWith(color: AppColors.successDark),
+            ),
+          ),
+        ],
+      ),
+      _ => null,
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        KwFieldLabel(s.registerReferralLabel),
+        KwTextField(
+          controller: _referral,
+          hintText: s.registerReferralHint,
+          errorText: _referralState == _Referral.invalid
+              ? s.registerReferralInvalid
+              : null,
+          textCapitalization: TextCapitalization.characters,
+          textInputAction: TextInputAction.done,
+          inputFormatters: const [ReferralCodeFormatter()],
+          prefix: const Icon(
+            Icons.card_giftcard_outlined,
+            size: 19,
+            color: AppColors.muted,
+          ),
+          suffix: _referralState == _Referral.valid
+              ? const Icon(
+                  Icons.check_circle_rounded,
+                  size: 18,
+                  color: AppColors.success,
+                )
+              : null,
+          onSubmitted: (_) => _submit(),
+          onChanged: _onReferralChanged,
+        ),
+        AnimatedSize(
+          duration: Motion.fast,
+          curve: Motion.enter,
+          alignment: Alignment.topLeft,
+          child: note == null
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(top: Gap.sm, left: Gap.xs),
+                  child: note,
+                ),
+        ),
+      ],
+    );
   }
 
   Widget _backRow() {
@@ -465,3 +622,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
+
+/// The referral field's verdict. [idle] covers "blank", "still typing" and
+/// "could not check" alike — none of those is a reason to stop a sign-up.
+enum _Referral { idle, checking, valid, invalid }
